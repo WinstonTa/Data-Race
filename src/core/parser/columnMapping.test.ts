@@ -67,7 +67,9 @@ describe("suggestMapping edge cases", () => {
   });
 
   it("ignores a mostly-numeric column whose header says Category", () => {
-    const grid = parseGrid(["Name,Category,2000", "A,1,10", "B,2,20"].join("\n"));
+    const grid = parseGrid(
+      ["Name,Category,2000", "A,1,10", "B,2,20"].join("\n"),
+    );
     const { mapping } = suggestMapping(grid);
     expect(mapping.categoryCol).toBe(1);
     expect(mapping.periodCols).toEqual([2]);

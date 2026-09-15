@@ -1,7 +1,8 @@
 import type { ColumnMapping, Grid } from "../types";
 import { isBlank, parseNumber } from "./parseNumber";
 
-export const CATEGORY_HEADERS = /^(category|group|type|sector|region|continent)$/i;
+export const CATEGORY_HEADERS =
+  /^(category|group|type|sector|region|continent)$/i;
 export const IMAGE_HEADERS =
   /^(image|img|icon|flag|logo|picture|photo|image\s*url)$/i;
 const NAME_HEADERS =

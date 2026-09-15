@@ -1,4 +1,5 @@
 # Data-Race
+
 Interactive bar chart races for data visualization.
 
 # 🏁 Data Race
@@ -9,19 +10,18 @@ Data Race allows anyone to upload temporal datasets, inspect and sanitize missin
 
 ## ⚡ Key Features
 
-* **Instant CSV Ingestion & Streaming:** Off-thread parsing powered by a dedicated Web Worker running `PapaParse` ensures the interface never hitches or drops frames during large uploads.
-* **Intelligent Entity Lifecycle Management:**
-  * **Last-Value Retention:** Missing intermediate time values seamlessly retain their prior known value until explicitly updated or pruned.
-  * **Smooth Exit Pruning:** Entities that leave the top tier or cease emitting data fade out gracefully with animated height and opacity transitions rather than abruptly snapping out of view.
-  * **Data Health Registry:** Entries containing zero valid metrics across the entire dataset timeline are safely filtered from the animation loop, accompanied by a non-intrusive alert table notifying the user.
-* **Custom Entity Assets & Fallbacks:** Upload custom logos, flags, or category badges directly in the tabular editor. The canvas compositor automatically clips assets into clean circular badges at the leading edge of each bar, falling back to clear typography labels if no image is present.
-* **Locked 16:9 Presentation Viewport:** Responsive, letterboxed 16:9 layout (`aspect-video`) with manual high-DPI canvas buffer scaling and an in-memory font-measurement cache to prevent text-measurement bottlenecks.
-* **Fully Deterministic Client-Side Video Export:** Generates standalone H.264 MP4 videos directly in the browser using the native **WebCodecs API** (`VideoEncoder`) multiplexed through **`mp4-muxer`**, stepping through time discretely ($\Delta t = \frac{1}{60\text{ s}}$) to eliminate dropped frames.
+- **Instant CSV Ingestion & Streaming:** Off-thread parsing powered by a dedicated Web Worker running `PapaParse` ensures the interface never hitches or drops frames during large uploads.
+- **Intelligent Entity Lifecycle Management:**
+  - **Last-Value Retention:** Missing intermediate time values seamlessly retain their prior known value until explicitly updated or pruned.
+  - **Smooth Exit Pruning:** Entities that leave the top tier or cease emitting data fade out gracefully with animated height and opacity transitions rather than abruptly snapping out of view.
+  - **Data Health Registry:** Entries containing zero valid metrics across the entire dataset timeline are safely filtered from the animation loop, accompanied by a non-intrusive alert table notifying the user.
+- **Custom Entity Assets & Fallbacks:** Upload custom logos, flags, or category badges directly in the tabular editor. The canvas compositor automatically clips assets into clean circular badges at the leading edge of each bar, falling back to clear typography labels if no image is present.
+- **Locked 16:9 Presentation Viewport:** Responsive, letterboxed 16:9 layout (`aspect-video`) with manual high-DPI canvas buffer scaling and an in-memory font-measurement cache to prevent text-measurement bottlenecks.
+- **Fully Deterministic Client-Side Video Export:** Generates standalone H.264 MP4 videos directly in the browser using the native **WebCodecs API** (`VideoEncoder`) multiplexed through **`mp4-muxer`**, stepping through time discretely ($\Delta t = \frac{1}{60\text{ s}}$) to eliminate dropped frames.
 
 ## 🏗 Architecture Overview
 
 The system is decoupled into an off-thread data processing layer, an interactive canvas loop, and a stepped video encoding worker:
-
 
 ```
 
@@ -46,16 +46,16 @@ The system is decoupled into an off-thread data processing layer, an interactive
 
 ## 💻 Tech Stack
 
-| Layer | Technology | Purpose |
-| :--- | :--- | :--- |
-| **Framework** | Next.js (React + TypeScript) | Application shell, state orchestration, and layout |
-| **Styling & UI** | Tailwind CSS + Radix UI (shadcn/ui) | Tabular workspace, controls, modals, and responsive layout |
-| **State Management** | Zustand (`useChartStore`) | Reactive store for parsed data, metadata, and playback state |
-| **Data Ingestion** | PapaParse (Web Worker) | Off-thread CSV streaming and validation |
-| **Interpolation** | D3-Interpolate & D3-Scale | Fractional linear interpolation (`lerp`), rankings, and dynamic scale bounds |
-| **Rendering Engine** | HTML5 Canvas 2D API | Hardware-accelerated drawing with font-metric caching and high-DPI scaling |
-| **Video Encoding** | WebCodecs API (`VideoEncoder`) | In-browser, hardware-accelerated H.264 (AVC) encoding |
-| **Video Packaging** | `mp4-muxer` | Containerization of encoded H.264 frames into a downloadable `.mp4` file |
+| Layer                | Technology                          | Purpose                                                                      |
+| :------------------- | :---------------------------------- | :--------------------------------------------------------------------------- |
+| **Framework**        | Next.js (React + TypeScript)        | Application shell, state orchestration, and layout                           |
+| **Styling & UI**     | Tailwind CSS + Radix UI (shadcn/ui) | Tabular workspace, controls, modals, and responsive layout                   |
+| **State Management** | Zustand (`useChartStore`)           | Reactive store for parsed data, metadata, and playback state                 |
+| **Data Ingestion**   | PapaParse (Web Worker)              | Off-thread CSV streaming and validation                                      |
+| **Interpolation**    | D3-Interpolate & D3-Scale           | Fractional linear interpolation (`lerp`), rankings, and dynamic scale bounds |
+| **Rendering Engine** | HTML5 Canvas 2D API                 | Hardware-accelerated drawing with font-metric caching and high-DPI scaling   |
+| **Video Encoding**   | WebCodecs API (`VideoEncoder`)      | In-browser, hardware-accelerated H.264 (AVC) encoding                        |
+| **Video Packaging**  | `mp4-muxer`                         | Containerization of encoded H.264 frames into a downloadable `.mp4` file     |
 
 ## 📁 Repository Structure
 
@@ -89,28 +89,35 @@ src/
 
 ## 📄 CSV Format Specification
 
-Data Race expects a standard long-form time-series CSV format. Columns can be identified automatically or mapped in the upload step:
+Data Race reads **wide-format** CSVs: one row per entity, one column per period.
 
 ```csv
-Date,Entity,Value,Category
-2020-01-01,Alpha,120,Tech
-2020-01-01,Beta,95,Finance
-2020-01-02,Alpha,128,Tech
-2020-01-02,Beta,102,Finance
-
+Name,Category,2000,2001,2002
+Alpha,Tech,120,128,140
+Beta,Finance,95,102,99
 ```
 
-* **Date:** Timestamp, Year, or sequential period (parsed chronologically).
-* **Entity:** The unique label identifying the bar.
-* **Value:** The numerical metric determining bar width.
-* **Category (Optional):** Used for automated color grouping.
+- **Name:** The label on each bar.
+- **Category (optional):** Entities in the same category share a colour.
+- **Period columns:** Any header (`2000`, `Q1 2024`, `Week 3` …). Cells may use
+  `$1,234`, `45%`, `(300)` or `1.2e6`; blanks and `n/a` are treated as missing,
+  and an entity holds its last known value through gaps.
+
+Messy real-world exports work too. The table editor shows the file exactly as
+uploaded and guesses the **header row**, **name column** and **period
+columns** — for example a World Bank download with a preamble, `Country Code`
+/ `Indicator Name` columns and a trailing empty column is mapped
+automatically. If the guess is wrong, pick the header row and name column in
+the table, tick or untick a column's **Period** box, click any cell to edit it,
+filter rows by name to hide aggregates in bulk, and download either the edited
+file or a clean **chart-ready CSV** (`Name, [Category], periods…`).
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-* **Node.js**: v18.x or later
-* **Browser**: Chrome, Edge, Safari 16.4+, or Firefox (WebCodecs support required for in-browser MP4 export)
+- **Node.js**: v18.x or later
+- **Browser**: Chrome, Edge, Safari 16.4+, or Firefox (WebCodecs support required for in-browser MP4 export)
 
 ### Installation
 
@@ -146,9 +153,9 @@ Unlike traditional screen-recording methods that drop frames when the computer s
 
 ## 🛡 Performance Best Practices
 
-* **Font Metric Caching:** Text widths are stored in an in-memory hash map to prevent frequent and expensive `ctx.measureText()` layout calculations.
-* **Sub-Pixel Smoothing:** Interpolated ranks are modeled as floating-point numbers so bars slide past each other seamlessly during vertical rank swaps.
-* **Decoupled Business Logic:** All interpolation math and ranking algorithms are written as pure TypeScript functions, completely independent of the DOM or Canvas APIs. This ensures effortless future migration to desktop wrappers (Tauri/Electron) or serverless Node worker pools.
+- **Font Metric Caching:** Text widths are stored in an in-memory hash map to prevent frequent and expensive `ctx.measureText()` layout calculations.
+- **Sub-Pixel Smoothing:** Interpolated ranks are modeled as floating-point numbers so bars slide past each other seamlessly during vertical rank swaps.
+- **Decoupled Business Logic:** All interpolation math and ranking algorithms are written as pure TypeScript functions, completely independent of the DOM or Canvas APIs. This ensures effortless future migration to desktop wrappers (Tauri/Electron) or serverless Node worker pools.
 
 ## 📄 License
 

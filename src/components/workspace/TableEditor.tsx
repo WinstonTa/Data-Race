@@ -1,199 +1,349 @@
 "use client";
 
-import { ImagePlus, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toChartReadyGrid } from "@/core/parser/chartReadyGrid";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  isPeriodCandidate,
+  profileColumns,
+  suggestMapping,
+} from "@/core/parser/columnMapping";
 import type { Entity } from "@/core/types";
-import { addImage, removeImage } from "@/lib/assets";
-import { useAssetStore } from "@/stores/useAssetStore";
+import { baseName } from "@/lib/download";
+import { downloadCsv } from "@/lib/projectFile";
 import { useProjectStore } from "@/stores/useProjectStore";
+import { GridTable } from "./GridTable";
+
+const PAGE_SIZE = 50;
+const HEADER_CHOICES = 25;
+const NONE = "__none__";
+
+function preview(row: string[], max = 60): string {
+  const text = row
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .join(", ");
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
 
 export function TableEditor() {
+  const source = useProjectStore((s) => s.source);
   const dataset = useProjectStore((s) => s.dataset);
-  if (!dataset) return null;
+  const sourceName = useProjectStore((s) => s.sourceName);
+  const setMapping = useProjectStore((s) => s.setMapping);
+  const setIncludedMany = useProjectStore((s) => s.setIncludedMany);
 
-  return (
-    <div className="overflow-x-auto rounded-lg border">
-      <Table className="text-sm">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-12">Show</TableHead>
-            <TableHead className="w-12">Color</TableHead>
-            <TableHead className="min-w-44">Name</TableHead>
-            <TableHead className="min-w-32">Category</TableHead>
-            <TableHead className="w-24">Icon</TableHead>
-            {dataset.periods.map((p) => (
-              <TableHead key={p} className="text-right font-mono text-xs">
-                {p}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {dataset.entities.map((e) => (
-            <EntityRow key={e.id} entity={e} />
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+  const [filter, setFilter] = useState("");
+  const [requestedPage, setPage] = useState(0);
+
+  const grid = source?.grid;
+  const mapping = source?.mapping;
+
+  const profiles = useMemo(
+    () => (grid && mapping ? profileColumns(grid, mapping.headerRow) : []),
+    [grid, mapping],
   );
-}
 
-function EntityRow({ entity }: { entity: Entity }) {
-  const update = useProjectStore((s) => s.updateEntity);
-  const hasData = entity.values.some((v) => v !== null);
+  const entityByRow = useMemo(() => {
+    const m = new Map<number, Entity>();
+    for (const e of dataset?.entities ?? [])
+      if (e.sourceRow !== undefined) m.set(e.sourceRow, e);
+    return m;
+  }, [dataset]);
 
-  return (
-    <TableRow className={entity.included ? "" : "opacity-50"}>
-      <TableCell>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span>
-              <Switch
-                checked={entity.included}
-                disabled={!hasData}
-                onCheckedChange={(v) => update(entity.id, { included: v })}
-                aria-label={`Show ${entity.name}`}
-              />
-            </span>
-          </TooltipTrigger>
-          {!hasData ? (
-            <TooltipContent>No numeric values in this row</TooltipContent>
-          ) : null}
-        </Tooltip>
-      </TableCell>
-      <TableCell>
-        <input
-          type="color"
-          className="size-7 cursor-pointer rounded border-0 bg-transparent p-0"
-          value={entity.color}
-          onChange={(ev) => update(entity.id, { color: ev.target.value })}
-          aria-label={`Color for ${entity.name}`}
-        />
-      </TableCell>
-      <TableCell>
-        <Input
-          className="h-8"
-          value={entity.name}
-          onChange={(ev) => update(entity.id, { name: ev.target.value })}
-        />
-      </TableCell>
-      <TableCell>
-        <Input
-          className="h-8"
-          value={entity.category ?? ""}
-          placeholder="—"
-          onChange={(ev) =>
-            update(entity.id, { category: ev.target.value || undefined })
-          }
-        />
-      </TableCell>
-      <TableCell>
-        <IconCell entity={entity} />
-      </TableCell>
-      {entity.values.map((v, i) => (
-        <TableCell
-          key={i}
-          className="text-muted-foreground text-right font-mono text-xs tabular-nums"
-        >
-          {v === null ? "·" : v.toLocaleString()}
-        </TableCell>
-      ))}
-    </TableRow>
-  );
-}
-
-function IconCell({ entity }: { entity: Entity }) {
-  const update = useProjectStore((s) => s.updateEntity);
-  const url = useAssetStore((s) =>
-    entity.imageId ? s.urls.get(entity.imageId) : undefined,
-  );
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const onFile = async (file: File | undefined) => {
-    if (!file) return;
-    try {
-      const previous = entity.imageId;
-      const id = await addImage(file);
-      update(entity.id, { imageId: id });
-      if (previous) await removeImage(previous);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load image.");
+  // Data rows (below the header) that match the name filter.
+  const dataRows = useMemo(() => {
+    if (!grid || !mapping) return [];
+    const q = filter.trim().toLowerCase();
+    const out: number[] = [];
+    for (let r = mapping.headerRow + 1; r < grid.length; r++) {
+      if (q && !(grid[r][mapping.nameCol] ?? "").toLowerCase().includes(q))
+        continue;
+      out.push(r);
     }
-  };
+    return out;
+  }, [grid, mapping, filter]);
 
-  const onRemove = async () => {
-    if (!entity.imageId) return;
-    const id = entity.imageId;
-    update(entity.id, { imageId: undefined });
-    await removeImage(id);
-  };
+  const pageCount = Math.max(1, Math.ceil(dataRows.length / PAGE_SIZE));
+  // Clamp instead of resetting in an effect: the grid can shrink under us.
+  const page = Math.min(requestedPage, pageCount - 1);
+
+  if (!grid || !mapping || !dataset) return null;
+
+  const contextRows = Array.from(
+    { length: mapping.headerRow + 1 },
+    (_, i) => i,
+  );
+  const pageRows = dataRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const rows = [...contextRows, ...pageRows];
+
+  const matchingEntities = dataRows
+    .map((r) => entityByRow.get(r))
+    .filter((e): e is Entity => !!e);
+  const emptyRows = dataset.entities.filter(
+    (e) => !e.values.some((v) => v !== null),
+  ).length;
+  const unusedCount = profiles.filter(
+    (p) =>
+      p.nonBlank > 0 &&
+      p.index !== mapping.nameCol &&
+      p.index !== mapping.categoryCol &&
+      !mapping.periodCols.includes(p.index),
+  ).length;
+
+  const columnOptions = profiles.map((p) => ({
+    value: String(p.index),
+    label: p.header || `Column ${p.index + 1}`,
+  }));
+
+  const stem = baseName(sourceName);
 
   return (
-    <div className="flex items-center gap-1">
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(ev) => {
-          void onFile(ev.target.files?.[0]);
-          ev.target.value = "";
-        }}
-      />
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8"
-            onClick={() => inputRef.current?.click()}
-            aria-label={`Upload icon for ${entity.name}`}
-          >
-            {url ? (
-              // eslint-disable-next-line @next/next/no-img-element -- object URL, not an optimizable asset
-              <img
-                src={url}
-                alt=""
-                className="size-6 rounded-full object-cover"
-              />
+    <div className="flex flex-col gap-3" id="column-setup">
+      <div className="flex flex-col gap-3 rounded-lg border p-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="header-row">Header row</Label>
+            <Select
+              value={String(mapping.headerRow)}
+              onValueChange={(v) =>
+                setMapping(
+                  suggestMapping(grid, { headerRow: Number(v) }).mapping,
+                )
+              }
+            >
+              <SelectTrigger id="header-row" className="w-80">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {grid.slice(0, HEADER_CHOICES).map((row, i) => (
+                  <SelectItem key={i} value={String(i)}>
+                    Row {i + 1}: {preview(row)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="name-col">Name column</Label>
+            <Select
+              value={String(mapping.nameCol)}
+              onValueChange={(v) =>
+                setMapping({ ...mapping, nameCol: Number(v) })
+              }
+            >
+              <SelectTrigger id="name-col" className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {columnOptions.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="category-col">Category column</Label>
+            <Select
+              value={
+                mapping.categoryCol === undefined
+                  ? NONE
+                  : String(mapping.categoryCol)
+              }
+              onValueChange={(v) =>
+                setMapping({
+                  ...mapping,
+                  categoryCol: v === NONE ? undefined : Number(v),
+                })
+              }
+            >
+              <SelectTrigger id="category-col" className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>None</SelectItem>
+                {columnOptions
+                  .filter((o) => o.value !== String(mapping.nameCol))
+                  .map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>Period columns</Label>
+            <div className="flex items-center gap-2">
+              <span className="text-sm tabular-nums">
+                {mapping.periodCols.length} selected
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setMapping({
+                    ...mapping,
+                    periodCols: profiles
+                      .filter(isPeriodCandidate)
+                      .map((p) => p.index),
+                  })
+                }
+              >
+                Select numeric columns
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={mapping.periodCols.length === 0}
+                onClick={() => setMapping({ ...mapping, periodCols: [] })}
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-muted-foreground text-sm">
+          {mapping.headerRow > 0
+            ? `${mapping.headerRow} row${mapping.headerRow === 1 ? "" : "s"} above the header ignored · `
+            : ""}
+          {dataset.entities.length} entities · {dataset.periods.length} periods
+          {unusedCount > 0
+            ? ` · ${unusedCount} column${unusedCount === 1 ? "" : "s"} unused`
+            : ""}
+          {emptyRows > 0
+            ? ` · ${emptyRows} row${emptyRows === 1 ? "" : "s"} with no data`
+            : ""}
+          . Tick a column&apos;s Period box to use it; click any cell to edit
+          it.
+        </p>
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              className="h-8 w-56"
+              placeholder="Filter rows by name…"
+              value={filter}
+              onChange={(ev) => {
+                setFilter(ev.target.value);
+                setPage(0);
+              }}
+              aria-label="Filter rows by name"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={matchingEntities.length === 0}
+              onClick={() =>
+                setIncludedMany(
+                  matchingEntities.map((e) => e.id),
+                  false,
+                )
+              }
+            >
+              Hide {matchingEntities.length} matching
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={matchingEntities.length === 0}
+              onClick={() =>
+                setIncludedMany(
+                  matchingEntities.map((e) => e.id),
+                  true,
+                )
+              }
+            >
+              Show {matchingEntities.length} matching
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {dataRows.length > PAGE_SIZE ? (
+              <div className="flex items-center gap-1 text-sm">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  disabled={page === 0}
+                  onClick={() => setPage(page - 1)}
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft />
+                </Button>
+                <span className="text-muted-foreground tabular-nums">
+                  Rows {page * PAGE_SIZE + 1}–
+                  {Math.min((page + 1) * PAGE_SIZE, dataRows.length)} of{" "}
+                  {dataRows.length}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  disabled={page >= pageCount - 1}
+                  onClick={() => setPage(page + 1)}
+                  aria-label="Next page"
+                >
+                  <ChevronRight />
+                </Button>
+              </div>
             ) : (
-              <ImagePlus className="text-muted-foreground" />
+              <span className="text-muted-foreground text-sm tabular-nums">
+                {dataRows.length} rows
+              </span>
             )}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          {error ?? (url ? "Replace icon" : "Upload icon (PNG/JPG/SVG)")}
-        </TooltipContent>
-      </Tooltip>
-      {url ? (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-6"
-          onClick={onRemove}
-          aria-label={`Remove icon for ${entity.name}`}
-        >
-          <X className="size-3" />
-        </Button>
-      ) : null}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => downloadCsv(grid, `${stem}-edited`)}
+            >
+              <Download /> Edited CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={mapping.periodCols.length === 0}
+              onClick={() =>
+                downloadCsv(
+                  toChartReadyGrid(grid, mapping),
+                  `${stem}-chart-ready`,
+                )
+              }
+            >
+              <Download /> Chart-ready CSV
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <GridTable
+        grid={grid}
+        mapping={mapping}
+        profiles={profiles}
+        entityByRow={entityByRow}
+        rows={rows}
+        onTogglePeriod={(col, on) =>
+          setMapping({
+            ...mapping,
+            periodCols: on
+              ? [...mapping.periodCols, col]
+              : mapping.periodCols.filter((c) => c !== col),
+          })
+        }
+      />
     </div>
   );
 }

@@ -58,12 +58,13 @@ describe("datasetToGrid", () => {
       ],
       warnings: [],
     };
-    const { grid, mapping } = datasetToGrid(ds);
+    const { grid, mapping, dataset } = datasetToGrid(ds);
     expect(grid).toEqual([
       ["Name", "Category", "2000", "2001"],
       ["A", "X", "1", ""],
       ["B", "", "2", "3"],
     ]);
+    expect(dataset.entities.map((e) => e.sourceRow)).toEqual([1, 2]);
     expect(mapping).toEqual({
       headerRow: 0,
       nameCol: 0,
@@ -75,7 +76,9 @@ describe("datasetToGrid", () => {
   it("omits the category column when no entity has one", () => {
     const ds: Dataset = {
       periods: ["Q1"],
-      entities: [{ id: "a", name: "A", color: "#000", values: [1], included: true }],
+      entities: [
+        { id: "a", name: "A", color: "#000", values: [1], included: true },
+      ],
       warnings: [],
     };
     const { grid, mapping } = datasetToGrid(ds);

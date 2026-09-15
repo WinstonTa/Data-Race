@@ -4,14 +4,13 @@ import { FileUp } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
-import { parseWideCsv } from "@/core/parser/parseWideCsv";
 import {
-  loadSampleDataset,
+  buildSampleCsv,
   SAMPLE_FILE_NAME,
   SAMPLE_SETTINGS,
 } from "@/data/sampleDataset";
+import { loadCsvText } from "@/lib/loadCsv";
 import { cn } from "@/lib/utils";
-import { usePlaybackStore } from "@/stores/usePlaybackStore";
 import { useProjectStore } from "@/stores/useProjectStore";
 
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -36,10 +35,7 @@ export function CsvDropzone() {
       return;
     }
     try {
-      const text = await file.text();
-      const dataset = parseWideCsv(text);
-      usePlaybackStore.setState({ t: 0, playing: false });
-      useProjectStore.getState().loadDataset(dataset, file.name);
+      loadCsvText(await file.text(), file.name);
       // The sample's captions don't belong on the user's data.
       useProjectStore.getState().updateSettings({
         title: humanizeFileName(file.name),
@@ -74,7 +70,9 @@ export function CsvDropzone() {
           <div className="text-sm">
             <div className="font-medium">Drop a CSV here</div>
             <div className="text-muted-foreground">
-              Wide format: <code>Name, [Category], 2000, 2001, …</code>
+              One row per entity, one column per period:{" "}
+              <code>Name, [Category], 2000, 2001, …</code>. Messy files are fine
+              — pick the header row and columns in the table below.
             </div>
           </div>
         </div>
@@ -82,10 +80,7 @@ export function CsvDropzone() {
           <Button
             variant="outline"
             onClick={() => {
-              usePlaybackStore.setState({ t: 0, playing: false });
-              useProjectStore
-                .getState()
-                .loadDataset(loadSampleDataset(), SAMPLE_FILE_NAME);
+              loadCsvText(buildSampleCsv(), SAMPLE_FILE_NAME);
               useProjectStore.getState().updateSettings(SAMPLE_SETTINGS);
             }}
           >

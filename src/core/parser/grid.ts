@@ -31,11 +31,12 @@ export function gridToCsv(grid: Grid): string {
  * Rebuild a grid from a Dataset that has no source grid (sample data, v1
  * project files, pre-mapping persisted state). Header row is
  * `Name, [Category], …periods`; entity rows are written in dataset order and
- * numbered so `sourceRow` lines up with the returned grid.
+ * the returned dataset has `sourceRow` set so later rebuilds carry edits over.
  */
 export function datasetToGrid(dataset: Dataset): {
   grid: Grid;
   mapping: ColumnMapping;
+  dataset: Dataset;
 } {
   const hasCategory = dataset.entities.some((e) => e.category);
   const header = [
@@ -54,6 +55,10 @@ export function datasetToGrid(dataset: Dataset): {
   const firstPeriod = hasCategory ? 2 : 1;
   return {
     grid,
+    dataset: {
+      ...dataset,
+      entities: dataset.entities.map((e, i) => ({ ...e, sourceRow: i + 1 })),
+    },
     mapping: {
       headerRow: 0,
       nameCol: 0,

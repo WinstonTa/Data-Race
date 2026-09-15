@@ -1,10 +1,12 @@
+import { gridToCsv } from "@/core/parser/grid";
 import {
   DEFAULT_SETTINGS,
   type ChartSettings,
   type Dataset,
+  type Grid,
 } from "@/core/types";
 import { usePlaybackStore } from "@/stores/usePlaybackStore";
-import { useProjectStore } from "@/stores/useProjectStore";
+import { useProjectStore, type ProjectSource } from "@/stores/useProjectStore";
 import {
   getImageBlob,
   hydrateImages,
@@ -13,13 +15,18 @@ import {
 } from "./assets";
 import { baseName, downloadBlob } from "./download";
 
-/** Portable project file: everything needed to reopen a project elsewhere. */
+/**
+ * Portable project file: everything needed to reopen a project elsewhere.
+ * v2 adds `source` (the raw grid + column mapping); v1 files still open and
+ * get a synthetic grid built from their dataset.
+ */
 export interface ProjectFile {
   app: "data-race";
-  version: 1;
+  version: 1 | 2;
   sourceName: string;
   settings: ChartSettings;
   dataset: Dataset;
+  source?: ProjectSource;
   /** imageId → data URL */
   images: Record<string, string>;
 }
@@ -34,7 +41,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 export async function saveProjectFile(): Promise<void> {
-  const { dataset, settings, sourceName } = useProjectStore.getState();
+  const { dataset, source, settings, sourceName } = useProjectStore.getState();
   if (!dataset) return;
 
   const images: Record<string, string> = {};
@@ -46,10 +53,11 @@ export async function saveProjectFile(): Promise<void> {
 
   const file: ProjectFile = {
     app: "data-race",
-    version: 1,
+    version: 2,
     sourceName,
     settings,
     dataset,
+    source: source ?? undefined,
     images,
   };
   downloadBlob(
@@ -63,10 +71,30 @@ function isProjectFile(x: unknown): x is ProjectFile {
   const p = x as Partial<ProjectFile>;
   return (
     p.app === "data-race" &&
-    p.version === 1 &&
+    (p.version === 1 || p.version === 2) &&
     !!p.dataset &&
     Array.isArray(p.dataset.periods) &&
     Array.isArray(p.dataset.entities)
+  );
+}
+
+function isProjectSource(x: unknown): x is ProjectSource {
+  if (!x || typeof x !== "object") return false;
+  const s = x as Partial<ProjectSource>;
+  return (
+    Array.isArray(s.grid) &&
+    !!s.mapping &&
+    typeof s.mapping.headerRow === "number" &&
+    typeof s.mapping.nameCol === "number" &&
+    Array.isArray(s.mapping.periodCols)
+  );
+}
+
+/** Download a grid as `<name>.csv`. */
+export function downloadCsv(grid: Grid, name: string): void {
+  downloadBlob(
+    new Blob([gridToCsv(grid)], { type: "text/csv;charset=utf-8" }),
+    `${name}.csv`,
   );
 }
 
@@ -103,8 +131,10 @@ export async function openProjectFile(file: File): Promise<void> {
   };
 
   usePlaybackStore.setState({ t: 0, playing: false });
+  const source = isProjectSource(parsed.source) ? parsed.source : null;
   useProjectStore.getState().loadProject({
     dataset,
+    source,
     settings: { ...DEFAULT_SETTINGS, ...parsed.settings },
     sourceName: parsed.sourceName || file.name,
   });
