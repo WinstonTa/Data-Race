@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseWideCsv } from "./parseWideCsv";
+import { WORLD_BANK_CSV } from "./worldbank.fixture";
 
 const ids = () => {
   let n = 0;
@@ -47,16 +48,15 @@ describe("parseWideCsv", () => {
   });
 
   it("flags non-numeric cells and treats them as missing", () => {
-    const ds = parseWideCsv(["Name,2000,2001", "A,abc,2"].join("\n"), {
-      idFactory: ids(),
-    });
+    const ds = parseWideCsv(
+      ["Name,2000,2001", "A,abc,2", "B,1,3", "C,2,4", "D,3,5", "E,4,6"].join(
+        "\n",
+      ),
+      { idFactory: ids() },
+    );
     expect(ds.entities[0].values).toEqual([null, 2]);
-    expect(ds.warnings).toEqual([
-      expect.objectContaining({
-        kind: "non-numeric",
-        entityId: "e0",
-        period: "2000",
-      }),
+    expect(ds.warnings.filter((w) => w.kind === "non-numeric")).toEqual([
+      expect.objectContaining({ entityId: "e0", period: "2000" }),
     ]);
   });
 
@@ -86,14 +86,54 @@ describe("parseWideCsv", () => {
     expect(ds.warnings.map((w) => w.kind)).toContain("no-period-columns");
   });
 
-  it("warns when an image column is present and ignores it", () => {
+  it("leaves an image column unused and says so", () => {
     const ds = parseWideCsv(
       ["Name,Image,2000", "A,https://x/y.png,1"].join("\n"),
       { idFactory: ids() },
     );
     expect(ds.periods).toEqual(["2000"]);
     expect(ds.entities[0].values).toEqual([1]);
-    expect(ds.warnings.map((w) => w.kind)).toContain("image-column-ignored");
+    const kinds = ds.warnings.map((w) => w.kind);
+    expect(kinds).toContain("unused-columns");
+    expect(kinds).toContain("mapping-uncertain");
+  });
+
+  it("recovers a World Bank export with a preamble and extra text columns", () => {
+    const ds = parseWideCsv(WORLD_BANK_CSV, { idFactory: ids() });
+    expect(ds.periods).toEqual([
+      "1960",
+      "1961",
+      "1962",
+      "1963",
+      "1964",
+      "1965",
+    ]);
+    expect(ds.entities.map((e) => e.name)).toEqual([
+      "Aruba",
+      "Africa Eastern and Southern",
+      "Afghanistan",
+      "Gibraltar",
+      "Angola",
+      "Albania",
+      "Andorra",
+      "United Arab Emirates",
+      "Argentina",
+    ]);
+    expect(ds.entities[0].values).toEqual([
+      null,
+      null,
+      null,
+      405586592.178771,
+      487709497.206704,
+      596648044.692737,
+    ]);
+    expect(ds.entities[0].sourceRow).toBe(3);
+    const kinds = ds.warnings.map((w) => w.kind);
+    expect(kinds).not.toContain("non-numeric");
+    expect(kinds.filter((k) => k === "empty-row")).toHaveLength(4);
+    expect(kinds).toContain("rows-above-header");
+    expect(kinds).toContain("unused-columns");
+    expect(kinds).toContain("mapping-uncertain");
   });
 
   it("skips rows with a blank name and fully blank lines", () => {

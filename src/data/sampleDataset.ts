@@ -1,5 +1,4 @@
-import { parseWideCsv } from "@/core/parser/parseWideCsv";
-import type { ChartSettings, Dataset } from "@/core/types";
+import type { ChartSettings } from "@/core/types";
 
 /**
  * Fictional demo data so the app renders something on first load.
@@ -56,7 +55,3 @@ export const SAMPLE_SETTINGS: Partial<ChartSettings> = {
   subtitle: "Fictional sample data — replace it with your own CSV",
   source: "Source: generated sample",
 };
-
-export function loadSampleDataset(): Dataset {
-  return parseWideCsv(buildSampleCsv());
-}

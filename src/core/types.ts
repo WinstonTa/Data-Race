@@ -19,6 +19,8 @@ export interface Entity {
   values: (number | null)[];
   /** false = excluded from the chart (auto for all-null rows; user-toggleable). */
   included: boolean;
+  /** Index of this entity's row in the source grid (see parser/grid.ts). */
+  sourceRow?: number;
 }
 
 export type HealthWarningKind =
@@ -27,13 +29,29 @@ export type HealthWarningKind =
   | "duplicate-name"
   | "no-period-columns"
   | "no-rows"
-  | "image-column-ignored";
+  | "rows-above-header"
+  | "unused-columns"
+  | "mapping-uncertain";
 
 export interface HealthWarning {
   kind: HealthWarningKind;
   message: string;
   entityId?: string;
   period?: string;
+}
+
+/** Raw CSV cells, rectangular (every row padded to the same width). */
+export type Grid = string[][];
+
+/**
+ * Which grid rows/columns feed the chart. Indices are into the Grid; period
+ * columns are kept in ascending file order.
+ */
+export interface ColumnMapping {
+  headerRow: number;
+  nameCol: number;
+  categoryCol?: number;
+  periodCols: number[];
 }
 
 export interface Dataset {

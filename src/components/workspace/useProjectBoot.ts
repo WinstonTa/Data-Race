@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import {
-  loadSampleDataset,
+  buildSampleCsv,
   SAMPLE_FILE_NAME,
   SAMPLE_SETTINGS,
 } from "@/data/sampleDataset";
 import { hydrateImages } from "@/lib/assets";
+import { loadCsvText } from "@/lib/loadCsv";
 import { useProjectStore } from "@/stores/useProjectStore";
 
 let bootPromise: Promise<void> | null = null;
@@ -27,10 +28,9 @@ export function bootProject(): Promise<void> {
       } catch {
         // Private mode / blocked storage: fall through with in-memory state.
       }
-      const store = useProjectStore.getState();
-      if (!store.dataset) {
-        store.loadDataset(loadSampleDataset(), SAMPLE_FILE_NAME);
-        store.updateSettings(SAMPLE_SETTINGS);
+      if (!useProjectStore.getState().dataset) {
+        loadCsvText(buildSampleCsv(), SAMPLE_FILE_NAME);
+        useProjectStore.getState().updateSettings(SAMPLE_SETTINGS);
       }
       const ids = new Set(
         useProjectStore
