@@ -12,12 +12,7 @@ import { communityName, fmtDec } from "./graphHooks";
 const PAGE_SIZE = 50;
 
 type SortKey =
-  | "name"
-  | "username"
-  | "degree"
-  | "betweenness"
-  | "clustering"
-  | "community";
+  "name" | "username" | "degree" | "betweenness" | "clustering" | "community";
 
 const COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
   { key: "name", label: "Display name" },

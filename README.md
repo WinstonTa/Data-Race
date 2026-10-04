@@ -112,6 +112,32 @@ the table, tick or untick a column's **Period** box, click any cell to edit it,
 filter rows by name to hide aggregates in bulk, and download either the edited
 file or a clean **chart-ready CSV** (`Name, [Category], periods…`).
 
+## 🕸 Friend Graph (`/graph`)
+
+A second workspace turns a Discord friend list into an interactive network:
+force-directed layout (ForceAtlas2, WebGL via Sigma.js), Louvain friend groups
+as colours, node size by number of mutuals, ringed "bridge" friends (high
+betweenness, linking different groups), click-to-highlight, search, a sortable
+table of every friend, and **PNG** / **Metrics CSV** exports. Everything is
+computed in the browser.
+
+It reads an **edge-list** CSV:
+
+```csv
+Friend_ID,Friend_Username,Friend_DisplayName,Mutual_ID,Mutual_Username,Mutual_DisplayName
+123456789012345678,ann,Ann,234567890123456789,bob,Bob
+234567890123456789,bob,Bob,123456789012345678,ann,Ann
+345678901234567890,cy,Cy,,,
+```
+
+- Each non-empty `Mutual_ID` is an undirected connection; listing a pair from
+  both sides is expected and merged.
+- Rows with an empty `Mutual_ID` keep friends who have no mutuals.
+- Only `Friend_ID` and `Mutual_ID` are required; headers are matched
+  case-insensitively. Ids are kept as text, so 18-digit Discord ids stay exact.
+- You (the account owner) aren't in the file; the **Show me** toggle draws a
+  "You" node for context without affecting any metric.
+
 ## 🚀 Getting Started
 
 ### Prerequisites

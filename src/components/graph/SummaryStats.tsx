@@ -37,7 +37,11 @@ export function SummaryStats() {
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
-        <Tile label="Friends" value={fmtInt(s.nodes)} hint="Nodes in the graph" />
+        <Tile
+          label="Friends"
+          value={fmtInt(s.nodes)}
+          hint="Nodes in the graph"
+        />
         <Tile
           label="Connections"
           value={fmtInt(s.edges)}

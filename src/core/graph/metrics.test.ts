@@ -31,11 +31,29 @@ function twoCliques(): GraphData {
 describe("localClustering", () => {
   it("is 1 inside a triangle and 0 at the center of a star", () => {
     const tri = localClustering(
-      toGraphology(graph(["a", "b", "c"], [["a", "b"], ["b", "c"], ["a", "c"]])),
+      toGraphology(
+        graph(
+          ["a", "b", "c"],
+          [
+            ["a", "b"],
+            ["b", "c"],
+            ["a", "c"],
+          ],
+        ),
+      ),
     );
     expect(tri).toEqual({ a: 1, b: 1, c: 1 });
     const star = localClustering(
-      toGraphology(graph(["h", "a", "b", "c"], [["h", "a"], ["h", "b"], ["h", "c"]])),
+      toGraphology(
+        graph(
+          ["h", "a", "b", "c"],
+          [
+            ["h", "a"],
+            ["h", "b"],
+            ["h", "c"],
+          ],
+        ),
+      ),
     );
     expect(star.h).toBe(0);
     expect(star.a).toBe(0);
@@ -45,7 +63,15 @@ describe("localClustering", () => {
     // h has neighbors a,b,c; only a–b are linked → 1 of 3 pairs.
     const c = localClustering(
       toGraphology(
-        graph(["h", "a", "b", "c"], [["h", "a"], ["h", "b"], ["h", "c"], ["a", "b"]]),
+        graph(
+          ["h", "a", "b", "c"],
+          [
+            ["h", "a"],
+            ["h", "b"],
+            ["h", "c"],
+            ["a", "b"],
+          ],
+        ),
       ),
     );
     expect(c.h).toBeCloseTo(1 / 3);
@@ -54,7 +80,15 @@ describe("localClustering", () => {
 
 describe("analyzeGraph", () => {
   it("computes degree and normalized betweenness on a path", () => {
-    const { metrics } = analyzeGraph(graph(["a", "b", "c"], [["a", "b"], ["b", "c"]]));
+    const { metrics } = analyzeGraph(
+      graph(
+        ["a", "b", "c"],
+        [
+          ["a", "b"],
+          ["b", "c"],
+        ],
+      ),
+    );
     expect(metrics.b.degree).toBe(2);
     expect(metrics.b.betweenness).toBeCloseTo(1);
     expect(metrics.a.betweenness).toBe(0);
@@ -95,7 +129,14 @@ describe("analyzeGraph", () => {
   it("orders communities largest first and buckets tiny ones", () => {
     const data = graph(
       ["a", "b", "c", "d", "p", "q"],
-      [["a", "b"], ["b", "c"], ["a", "c"], ["c", "d"], ["a", "d"], ["p", "q"]],
+      [
+        ["a", "b"],
+        ["b", "c"],
+        ["a", "c"],
+        ["c", "d"],
+        ["a", "d"],
+        ["p", "q"],
+      ],
     );
     const { communities, metrics } = analyzeGraph(data);
     expect(communities[0].size).toBeGreaterThanOrEqual(3);

@@ -26,7 +26,10 @@ product decisions, and known gotchas. Don't re-explore the tree to find things.
 - Persistence boot goes through `bootProject()` in
   `src/components/workspace/useProjectBoot.ts` only. Don't call
   `useProjectStore.persist.rehydrate()` elsewhere (StrictMode double-run bug).
+  The friend graph's equivalent is `bootGraph()` in
+  `src/components/graph/useGraphBoot.ts` for `useGraphStore`.
 - zustand selectors must return stable references — no `?? []` / `?? {}` inline.
+- Discord ids in `src/core/graph/**` are strings (snowflakes exceed 2^53).
 - Locked scope (wide CSV only, last-value retention, 1080p 30/60 only, single
   project, Chrome/Edge primary) is listed in `docs/HANDOFF.md` §2. Ask before
   changing any of it.

@@ -29,7 +29,7 @@ export const EGO_ID = "__ego__";
 const DIM_NODE = "#e5e7eb";
 const EDGE_COLOR = "rgba(71, 85, 105, 0.5)";
 const EDGE_FOCUS = "rgba(31, 41, 55, 0.65)";
-const EGO_EDGE = "rgba(148, 163, 184, 0.35)";
+const EGO_EDGE = "rgba(71, 85, 105, 0.3)";
 const BRIDGE_BORDER = "#111827";
 const MAX_FORCED_LABELS = 40;
 
@@ -153,7 +153,7 @@ function syncEgo(graph: DisplayGraph, show: boolean) {
     ego: true,
   });
   for (const f of friends)
-    graph.addEdge(EGO_ID, f, { size: 0.5, color: EGO_EDGE, ego: true });
+    graph.addEdge(EGO_ID, f, { size: 1, color: EGO_EDGE, ego: true });
 }
 
 export function GraphCanvas() {
@@ -194,6 +194,8 @@ export function GraphCanvas() {
       labelSize: 12,
       labelRenderedSizeThreshold: 9,
       zIndex: true,
+      // The container can briefly be 0×0 (route transitions, hidden tabs).
+      allowInvalidContainer: true,
       minCameraRatio: 0.03,
       maxCameraRatio: 6,
       nodeReducer: (node, attrs) => {
@@ -241,6 +243,8 @@ export function GraphCanvas() {
     // Sigma only listens to window resizes; the grid cell can change size
     // on its own (scrollbars, breakpoints, side panel content).
     const resizeObserver = new ResizeObserver(() => {
+      // Zero-size during route transitions; sigma throws on an empty container.
+      if (!container.offsetWidth || !container.offsetHeight) return;
       sigma.resize(true);
       sigma.refresh();
     });
@@ -425,4 +429,3 @@ export function GraphCanvas() {
     </div>
   );
 }
-

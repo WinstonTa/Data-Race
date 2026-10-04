@@ -8,7 +8,13 @@ import { nodeLabel } from "@/core/graph/types";
 import { useGraphStore } from "@/stores/useGraphStore";
 import { communityName, fmtDec, useNodeIndex } from "./graphHooks";
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-sm">
       <span className="text-muted-foreground shrink-0">{label}</span>

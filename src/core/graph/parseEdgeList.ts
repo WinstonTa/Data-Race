@@ -10,7 +10,11 @@ export const EDGE_LIST_HEADERS = [
   "Mutual_DisplayName",
 ] as const;
 
-const norm = (s: string) => s.trim().toLowerCase().replace(/[\s_-]+/g, "");
+const norm = (s: string) =>
+  s
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
 
 /** Column index per expected header, or -1 when absent. */
 function findColumns(header: string[]) {
@@ -61,7 +65,8 @@ export function parseEdgeList(grid: Grid): {
   let blankIds = 0;
   let nameConflicts = 0;
 
-  const cell = (row: string[], i: number) => (i >= 0 ? (row[i] ?? "").trim() : "");
+  const cell = (row: string[], i: number) =>
+    i >= 0 ? (row[i] ?? "").trim() : "";
 
   const upsert = (id: string, username: string, displayName: string) => {
     const existing = nodes.get(id);
@@ -128,11 +133,7 @@ export function parseEdgeList(grid: Grid): {
     duplicates,
     `${duplicates} row(s) repeat an earlier friend–mutual pair; merged.`,
   );
-  warn(
-    "blank-ids",
-    blankIds,
-    `${blankIds} row(s) have no Friend_ID; skipped.`,
-  );
+  warn("blank-ids", blankIds, `${blankIds} row(s) have no Friend_ID; skipped.`);
   warn(
     "mutual-not-friend",
     notFriends.length,

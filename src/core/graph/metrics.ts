@@ -117,9 +117,7 @@ export function analyzeGraph(
   }
 
   // --- bridges -----------------------------------------------------------
-  const ranked = nodes
-    .map((n) => betweenness[n] ?? 0)
-    .sort((a, b) => b - a);
+  const ranked = nodes.map((n) => betweenness[n] ?? 0).sort((a, b) => b - a);
   const cutoffIndex = Math.max(1, Math.ceil(nodes.length * BRIDGE_TOP_SHARE));
   const cutoff = ranked[cutoffIndex - 1] ?? Infinity;
 

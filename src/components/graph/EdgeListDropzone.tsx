@@ -73,9 +73,7 @@ export function EdgeListDropzone() {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={() =>
-              load(buildSampleFriendCsv(), SAMPLE_GRAPH_FILE_NAME)
-            }
+            onClick={() => load(buildSampleFriendCsv(), SAMPLE_GRAPH_FILE_NAME)}
           >
             Load sample
           </Button>
