@@ -1,6 +1,6 @@
 # Data Race — Handoff Brief
 
-_Last updated 2026-09-15. Read this before touching code; it replaces an hour of repo spelunking._
+_Last updated 2026-10-03. Read this before touching code; it replaces an hour of repo spelunking._
 
 ## 1. What this is
 
@@ -8,24 +8,27 @@ _Last updated 2026-09-15. Read this before touching code; it replaces an hour of
 
 The MVP is **feature-complete and verified** (see §6). Remaining work is polish, deployment, and whatever new features Winston asks for.
 
+A second, independent workspace lives at **`/graph`** (added 2026-10-03, branch `feature/graphview`): drop a Discord friends **edge-list CSV** → force-directed network with Louvain groups, betweenness "bridges", per-friend metrics, search, sortable table, PNG + metrics-CSV export. It shares only UI primitives, `parseGrid`, `idbStorage`, `downloadBlob` and the palette with the bar race.
+
 ## 2. Locked product decisions (do not re-litigate)
 
-| Topic        | Decision                                                                                                                                                                                                            |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CSV input    | **Wide only**: one row per entity, one column per period. Long/tidy format is out of scope. Header row / name / category / period columns are auto-guessed and user-mappable (branch `fix/data_input`, 2026-09-15). |
-| Time axis    | Uniform per period; headers are raw string labels (no date parsing).                                                                                                                                                |
-| Speed        | `secondsPerPeriod` (default 0.5 s). Total length = (periods − 1) × spp.                                                                                                                                             |
-| Motion       | Smooth: lerp **value and rank** between keyframes.                                                                                                                                                                  |
-| Missing data | **Last-value retention.** Entity is absent until its first non-null value, then holds the last known value through gaps to the end.                                                                                 |
-| Colors       | Palette per entity; a `Category` column makes entities share a color. All overridable in the table.                                                                                                                 |
-| Chrome       | Title, subtitle, big period label, value labels, source/caption line.                                                                                                                                               |
-| Top N        | Configurable (3–25), default 10. Horizontal bars only.                                                                                                                                                              |
-| Export       | PNG + MP4 at **1080p, 30 or 60 fps**. No 4K, no audio.                                                                                                                                                              |
-| Browsers     | Chrome/Edge primary. WebCodecs-without-H.264 → WebM/VP9 fallback. No WebCodecs → notice. Preview + PNG work everywhere.                                                                                             |
-| Persistence  | Single auto-saved project in IndexedDB + `.datarace.json` save/open. No multi-project gallery.                                                                                                                      |
-| Video lib    | `mediabunny` (successor to `mp4-muxer`). Never `captureStream`/`MediaRecorder`.                                                                                                                                     |
-| Table lib    | Plain `<table>` + click-to-edit cells, 50 rows/page, no virtualisation dep. TanStack Table was dropped (v9 API rewrite).                                                                                            |
-| Grid model   | The raw CSV grid + `ColumnMapping` are the source of truth (persisted, in project file v2); `Dataset` is derived via `buildDataset`.                                                                                |
+| Topic        | Decision                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CSV input    | **Wide only**: one row per entity, one column per period. Long/tidy format is out of scope. Header row / name / category / period columns are auto-guessed and user-mappable (branch `fix/data_input`, 2026-09-15).                                                                                                                                                                                       |
+| Time axis    | Uniform per period; headers are raw string labels (no date parsing).                                                                                                                                                                                                                                                                                                                                      |
+| Speed        | `secondsPerPeriod` (default 0.5 s). Total length = (periods − 1) × spp.                                                                                                                                                                                                                                                                                                                                   |
+| Motion       | Smooth: lerp **value and rank** between keyframes.                                                                                                                                                                                                                                                                                                                                                        |
+| Missing data | **Last-value retention.** Entity is absent until its first non-null value, then holds the last known value through gaps to the end.                                                                                                                                                                                                                                                                       |
+| Colors       | Palette per entity; a `Category` column makes entities share a color. All overridable in the table.                                                                                                                                                                                                                                                                                                       |
+| Chrome       | Title, subtitle, big period label, value labels, source/caption line.                                                                                                                                                                                                                                                                                                                                     |
+| Top N        | Configurable (3–25), default 10. Horizontal bars only.                                                                                                                                                                                                                                                                                                                                                    |
+| Export       | PNG + MP4 at **1080p, 30 or 60 fps**. No 4K, no audio.                                                                                                                                                                                                                                                                                                                                                    |
+| Browsers     | Chrome/Edge primary. WebCodecs-without-H.264 → WebM/VP9 fallback. No WebCodecs → notice. Preview + PNG work everywhere.                                                                                                                                                                                                                                                                                   |
+| Persistence  | Single auto-saved project in IndexedDB + `.datarace.json` save/open. No multi-project gallery.                                                                                                                                                                                                                                                                                                            |
+| Video lib    | `mediabunny` (successor to `mp4-muxer`). Never `captureStream`/`MediaRecorder`.                                                                                                                                                                                                                                                                                                                           |
+| Table lib    | Plain `<table>` + click-to-edit cells, 50 rows/page, no virtualisation dep. TanStack Table was dropped (v9 API rewrite).                                                                                                                                                                                                                                                                                  |
+| Grid model   | The raw CSV grid + `ColumnMapping` are the source of truth (persisted, in project file v2); `Dataset` is derived via `buildDataset`.                                                                                                                                                                                                                                                                      |
+| Friend graph | Separate `/graph` route. Input is a Discord **edge list** (`Friend_ID…Mutual_DisplayName`); wide-only applies to the bar race only. Sigma.js v3 + graphology. Ego (account owner) excluded from metrics; "Show me" adds a visual-only node. Min-degree slider is visibility-only (metrics on the full graph). Auto-saved to IDB key `data-race-graph`; exports = PNG of the view + metrics CSV. No video. |
 
 ## 3. Tech stack
 
@@ -35,6 +38,7 @@ The MVP is **feature-complete and verified** (see §6). Remaining work is polish
 - **papaparse**, **d3-scale / d3-array / d3-format** (no d3-interpolate — plain lerp)
 - **mediabunny** (WebCodecs `VideoEncoder` + MP4/WebM muxing, handles backpressure)
 - **react-dropzone**, **Vitest 5**, Prettier (+ tailwind plugin), ESLint (next config)
+- Friend graph: **graphology** (+ `-communities-louvain`, `-metrics`, `-layout`, `-layout-forceatlas2`), **sigma 3**, `@sigma/node-border` (bridge rings), `@sigma/export-image` (PNG)
 - **pnpm 12**, deploy target Vercel
 
 ## 4. Architecture in one picture
@@ -120,6 +124,19 @@ Data-Race/
     │   │   ├── textCache.ts     TextMeasurer: memoized measureText + fit() ellipsis
     │   │   ├── fonts.ts         CHART_FONT_FAMILY, chartFont(weight,size), loadChartFonts(fontSet, origin)
     │   │   └── palette.ts       DEFAULT_PALETTE (20 colors), assignColors(entities)
+    │   ├── random.ts            mulberry32(seed) PRNG (sample data + seeded Louvain)
+    │   ├── graph/               ★ Friend graph, pure + tested
+    │   │   ├── types.ts         FriendNode/FriendEdge/GraphData (ids are STRINGS), NodeMetrics,
+    │   │   │                    CommunityInfo, GraphSummary, GraphAnalysis, nodeLabel()
+    │   │   ├── parseEdgeList.ts Grid → {data, warnings}: header match is case/separator-insensitive,
+    │   │   │                    undirected dedup (A→B + B→A is normal; only exact repeated rows
+    │   │   │                    warn), self-loops dropped, empty Mutual_ID keeps isolates
+    │   │   ├── buildGraph.ts    toGraphology(data) → UndirectedGraph
+    │   │   ├── metrics.ts       analyzeGraph(data,{seed}): degree, local clustering (hand-rolled),
+    │   │   │                    normalized betweenness, seeded Louvain renumbered largest-first,
+    │   │   │                    ≤2-member groups → grey "Other", isolates → community null,
+    │   │   │                    bridge = top-10 % betweenness AND neighbours in ≥2 communities
+    │   │   └── metricsCsv.ts    metricsToGrid(data, analysis) for the Metrics CSV export
     │   └── export/
     │       ├── codecSupport.ts  probeExportPlan(w,h) → {codec:'avc'|'vp9', container, ext, label} | null
     │       ├── exportVideo.ts   exportVideo(canvas, job, assets, onProgress, signal) → Blob.
@@ -128,8 +145,10 @@ Data-Race/
     │       └── exportPng.ts     exportPng(frameCtx, settings, assets, t) → PNG Blob via OffscreenCanvas
     │
     ├── workers/
-    │   └── export.worker.ts     Message protocol {start|cancel} → {progress|done|error}.
-    │                            Loads Inter via self.fonts, runs exportVideo on an OffscreenCanvas.
+    │   ├── export.worker.ts     Message protocol {start|cancel} → {progress|done|error}.
+    │   │                        Loads Inter via self.fonts, runs exportVideo on an OffscreenCanvas.
+    │   └── graph.worker.ts      {analyze, data} → {done, analysis}|{error}; runs analyzeGraph
+    │                            (betweenness is O(V·E), too slow for the main thread).
     │
     ├── stores/
     │   ├── useProjectStore.ts   source {grid, mapping}, dataset, settings, sourceName.
@@ -137,6 +156,10 @@ Data-Race/
     │   │                        with prev) / loadProject / updateEntity / setIncludedMany / updateSettings /
     │   │                        clear. persist v2 (IDB, skipHydration:true — hydration is triggered by
     │   │                        useProjectBoot); `merge` synthesises `source` for v1 saves via datasetToGrid.
+    │   ├── useGraphStore.ts     Friend graph: data, warnings, sourceName, positions, settings
+    │   │                        {minDegree, repulsion, showEgo} persisted (IDB key data-race-graph,
+    │   │                        skipHydration). Session-only: analysis, selectedId, focusNonce
+    │   │                        (camera → node), layoutNonce (re-run layout), layoutRunning.
     │   ├── usePlaybackStore.ts  t (period units), playing, speed. NOT persisted.
     │   └── useAssetStore.ts     bitmaps: Map<imageId, ImageBitmap> (renderer input) +
     │                            urls: Map<imageId, objectURL> (table thumbnails). Closes/revokes on replace.
@@ -151,6 +174,8 @@ Data-Race/
     │   │                        (no source) too. downloadCsv(grid, name). Re-keys images on open.
     │   ├── loadCsv.ts           loadCsvText(text, fileName): parseGrid → store.loadSource → rewind
     │   │                        playback. Used by the dropzone, "Load sample" and first-visit boot.
+    │   ├── loadEdgeList.ts      loadEdgeListText(text, name): parseGrid → parseEdgeList → graph store
+    │   ├── graphAnalysisClient.ts  analyzeInWorker(data) → {result, cancel} (spawns graph.worker)
     │   ├── exportClient.ts      startVideoExport(job, bitmaps, onProgress) → {result: Promise<Blob>, cancel}.
     │   │                        Spawns the worker (new Worker(new URL('../workers/export.worker.ts',
     │   │                        import.meta.url), {type:'module'})), clones bitmaps before transfer.
@@ -158,11 +183,14 @@ Data-Race/
     │   └── utils.ts             cn() re-export (shadcn)
     │
     ├── data/
-    │   └── sampleDataset.ts     Deterministic fictional "coffee chains" CSV (seeded PRNG):
-    │                            buildSampleCsv(), SAMPLE_FILE_NAME, SAMPLE_SETTINGS
+    │   ├── sampleDataset.ts     Deterministic fictional "coffee chains" CSV (seeded PRNG):
+    │   │                        buildSampleCsv(), SAMPLE_FILE_NAME, SAMPLE_SETTINGS
+    │   └── sampleFriendGraph.ts Deterministic fictional Discord export: 61 friends, 5 groups,
+    │                            4 planted bridges, 4 isolates; buildSampleFriendCsv()
     │
     └── components/
         ├── ErrorBoundary.tsx    Class boundary with "Try again" / "Reset project"
+        ├── AppNav.tsx           next/link tabs "Bar race" (/) ↔ "Friend graph" (/graph)
         ├── ui/                  shadcn generated: button dialog input label slider select tabs alert
         │                        tooltip popover progress switch table badge separator scroll-area
         ├── workspace/
@@ -200,12 +228,27 @@ Data-Race/
         │   ├── useFrameContext.ts  useMemo(buildKeyframes + indexEntities) keyed on dataset/topN
         │   ├── useKeyboardShortcuts.ts  Space, ←/→ (step period), Home/End. Ignored in inputs/dialogs.
         │   └── ScrubControls.tsx  Restart, play/pause, slider (step 0.01), period + elapsed readout, speed
+        ├── graph/               Friend graph workspace (route src/app/graph/page.tsx)
+        │   ├── GraphWorkspace.tsx  Client boundary: bootGraph gate, useGraphAnalysis, header (nav +
+        │   │                    GraphExportButtons), EdgeListDropzone, GraphWarnings, SummaryStats,
+        │   │                    grid [GraphCanvas | side panel], NodeTable. GraphCanvas is ssr:false.
+        │   ├── useGraphBoot.ts  ★ bootGraph() singleton: rehydrate graph store → sample if empty
+        │   ├── useGraphAnalysis.ts  Runs the worker when `data` changes; stale jobs can't write back
+        │   ├── GraphCanvas.tsx  Owns the Sigma instance + FA2 worker supervisor. Builds a display
+        │   │                    graph from data+analysis (seeded community-blob positions unless
+        │   │                    persisted ones exist); reducers read useGraphStore.getState() for
+        │   │                    min-degree/selection/hover; a store.subscribe() drives refresh,
+        │   │                    ego, re-layout and camera focus without React re-renders. Drag pins
+        │   │                    nodes (fixed) and stops a running layout. ResizeObserver → resize.
+        │   ├── sigmaRegistry.ts Live Sigma instance for PNG export / zoom buttons
+        │   └── GraphControls, FriendSearch, NodeDetails, TopLists, SummaryStats, NodeTable,
+        │                        GraphExportButtons, GraphWarnings, EdgeListDropzone, graphHooks
         └── export/
             └── ExportDialog.tsx Tabs: Video (probe plan → fps select → progress/cancel → download)
                                  and PNG snapshot (current t).
 ```
 
-**Tests** (`pnpm test`, 81 passing): `core/parser/*.test.ts` (grid, columnMapping, buildDataset, chartReadyGrid, parseWideCsv, parseNumber), `core/timeline/timeline.test.ts`, `core/render/textCache.test.ts`. Pattern: pure functions with fixture data; parser tests inject `idFactory` for deterministic ids.
+**Tests** (`pnpm test`, 99 passing): `core/parser/*.test.ts` (grid, columnMapping, buildDataset, chartReadyGrid, parseWideCsv, parseNumber), `core/timeline/timeline.test.ts`, `core/render/textCache.test.ts`, `core/graph/{parseEdgeList,metrics}.test.ts`. Pattern: pure functions with fixture data; parser tests inject `idFactory` for deterministic ids.
 
 ## 6. Verified so far (2026-09-13, Chrome via the in-app browser)
 
@@ -216,6 +259,8 @@ Data-Race/
 - `pnpm test` / `typecheck` / `lint` / `format` / `build` all clean.
 
 **2026-09-15, column mapping (Chrome via the in-app browser), using the real World Bank GDP export (`API_NY.GDP.MKTP.CD_DS2_en_csv_v2_*.csv`, 270 lines × 71 cols):** auto-mapping picks header row 3, `Country Name`, 66 period columns, leaves `Country Code`/`Indicator Name`/`Indicator Code` + the trailing empty column unused, reports 4 genuinely empty rows and zero non-numeric cells; chart renders 1960→2025. Verified: cell edit to `abc` → red cell + non-numeric warning, edit back clears it; unticking/reticking a period column and swapping the name column keep entity ids and a custom colour; filter "income" + Hide → 11 aggregates drop out of the chart; reload restores grid/mapping/colour/toggles from IDB (persist v2); Save → Open round-trips (575 KB), a v1 project file opens with a synthesised grid; "Edited CSV" = 268×71 with edits, "Chart-ready CSV" = `Name,1960…2025` × 265 rows; sample loads with `confident=true` and no alerts; 211-frame MP4 export still works.
+
+**2026-10-03, friend graph (Chrome via the in-app browser, sample data):** analysis recovers all 5 planted groups (modularity 0.69) and flags the planted bridges; click/search/top-list/table selection opens the drawer and centres the camera with non-neighbours dimmed; click stage deselects; synthetic drag moves + pins a node without selecting it; min-degree 5 → 34 of 61 shown with the summary unchanged; repulsion change re-runs layout; Show me adds the You node + spokes; reload restores graph, positions, settings and colours without re-layout; PNG (1407×1223) and Metrics CSV (header + 61 rows, 18-digit ids intact) captured via a `URL.createObjectURL` hook; `/` ↔ `/graph` round trips leave one Sigma instance and no errors; the static `out/` build runs the analysis worker and the FA2 blob worker. **Not verified:** a real Discord export at scale (~1000 friends).
 
 **Not verified:** WebM fallback and "unsupported" notice paths (only Chrome was available); real browser download UX (downloads were intercepted in the sandbox); Vercel deploy.
 
@@ -236,6 +281,13 @@ Data-Race/
 13. **`parseGrid` drops fully blank lines** (PapaParse `skipEmptyLines: "greedy"`), so the "Edited CSV" download of a file with blank lines has fewer rows than the original. Cells are otherwise verbatim.
 14. **Entity ids are stable via `sourceRow`.** `buildDataset(..., { prev })` reuses the previous entity for the same grid row. A new row (e.g. typing a name into a previously blank name cell) gets a fresh id; blanking a row's name drops its entity and its colour/icon overrides with it.
 15. **zustand `persist` re-serialises the whole grid on every `set`.** Fine for the 300 KB World Bank file; a multi-MB CSV would make each cell edit noticeably slow. Throttle persistence if that ever matters.
+16. **Discord ids are strings end-to-end.** Snowflakes exceed 2^53; never `Number()` them or sort them numerically. `parseGrid` already keeps cells as text.
+17. **`bootGraph()` is the graph store's only rehydrate path** (same StrictMode singleton reasoning as #1).
+18. **Louvain is seeded** (`DEFAULT_ANALYSIS_SEED`) so groups and colours are stable across reloads; communities are renumbered largest-first, so "Group 1" is always the biggest.
+19. **Sigma edge alpha is eaten by antialiasing.** ~1 px WebGL lines are mostly feather, so an rgba alpha of 0.2 renders near-invisible. Edges use `rgba(71,85,105,0.5)`. Verify edge colours by exporting a PNG and inspecting pixels, not with downscaled pane screenshots.
+20. **Sigma only listens to `window.resize`.** `GraphCanvas` adds a ResizeObserver (skipping 0×0 sizes during route transitions, which throw) and sets `allowInvalidContainer`.
+21. **The FA2 worker snapshots `fixed` at start** and overwrites positions while running, so dragging stops the layout first. Graph structure changes (ego toggle) respawn the FA2 worker automatically.
+22. **Static export prefetch 404s locally.** Next 16 writes nested RSC segment files as folders (`out/graph/__next.graph/__PAGE__.txt`) but requests `/graph/__next.graph.__PAGE__.txt`; a plain `python -m http.server` 404s it (prefetch only, navigation still works). `/graph` is `out/graph.html` locally.
 
 ## 8. Suggested next steps (not yet requested — confirm with Winston first)
 
@@ -243,6 +295,7 @@ Data-Race/
 - Test in Firefox/Safari for the WebM fallback + notice.
 - Polish candidates: gridline fade when tick set changes; per-category legend; "step" motion toggle; 4K export (needs codec probe at 3840×2160 and bitrate scaling — already parametrised in `exportVideo.ts`); image-URL column support (fetch + CORS).
 - Table editor follow-ups: "no header row" mode; add/delete rows; virtualised rows for very large files; throttled persistence (see §7 #15); a "hide aggregates" preset for World Bank files (their `Metadata_Country_*.csv` has a blank Region for aggregates).
+- Friend graph follow-ups: test a real ~1000-friend export (betweenness + FA2 timing); community renaming; hide-isolates toggle; ego-network view (radius-1 subgraph of one friend); dark-mode canvas colours.
 - Playwright smoke test for the export path so regressions are caught outside a manual browser session.
 
 ## 9. Commands
