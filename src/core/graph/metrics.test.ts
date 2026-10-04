@@ -125,10 +125,8 @@ describe("sample friend graph", () => {
     expect(csv).toBe(buildSampleFriendCsv());
     const { data, warnings } = parseEdgeList(parseGrid(csv));
     expect(data.nodes.length).toBe(61);
-    // Every mutual pair is listed from both sides.
-    expect(warnings.find((w) => w.kind === "duplicate-edges")?.count).toBe(
-      data.edges.length,
-    );
+    // Every mutual pair is listed from both sides, which is not a warning.
+    expect(warnings).toEqual([]);
     const { summary } = analyzeGraph(data);
     expect(summary.isolates).toBe(4);
     expect(summary.communities).toBeGreaterThanOrEqual(4);

@@ -16,6 +16,16 @@ describe("parseEdgeList", () => {
     ]);
     expect(data.edges).toEqual([{ source: "1", target: "2" }]);
     expect(data.nodes.map((n) => n.id).sort()).toEqual(["1", "2"]);
+    // Listing a pair from both sides is normal for an export: no warning.
+    expect(warnings.find((w) => w.kind === "duplicate-edges")).toBeUndefined();
+  });
+
+  it("reports exact repeated rows", () => {
+    const { data, warnings } = parse([
+      "1,ann,Ann,2,bob,Bob",
+      "1,ann,Ann,2,bob,Bob",
+    ]);
+    expect(data.edges).toHaveLength(1);
     expect(warnings.find((w) => w.kind === "duplicate-edges")?.count).toBe(1);
   });
 

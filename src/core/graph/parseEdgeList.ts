@@ -54,6 +54,7 @@ export function parseEdgeList(grid: Grid): {
   const nodes = new Map<string, FriendNode>();
   const friendIds = new Set<string>();
   const edgeKeys = new Set<string>();
+  const rowKeys = new Set<string>();
   const edges: FriendEdge[] = [];
   let selfLoops = 0;
   let duplicates = 0;
@@ -98,13 +99,15 @@ export function parseEdgeList(grid: Grid): {
       selfLoops++;
       continue;
     }
+    // Exports list each pair from both sides (A→B and B→A); only an exact
+    // repeat of the same row is worth reporting.
+    const rowKey = `${friendId}>${mutualId}`;
+    if (rowKeys.has(rowKey)) duplicates++;
+    rowKeys.add(rowKey);
     const [source, target] =
       friendId < mutualId ? [friendId, mutualId] : [mutualId, friendId];
     const key = `${source}|${target}`;
-    if (edgeKeys.has(key)) {
-      duplicates++;
-      continue;
-    }
+    if (edgeKeys.has(key)) continue;
     edgeKeys.add(key);
     edges.push({ source, target });
   }
@@ -123,7 +126,7 @@ export function parseEdgeList(grid: Grid): {
   warn(
     "duplicate-edges",
     duplicates,
-    `${duplicates} connection(s) appeared more than once (A–B and B–A are the same); merged.`,
+    `${duplicates} row(s) repeat an earlier friend–mutual pair; merged.`,
   );
   warn(
     "blank-ids",
