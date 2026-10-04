@@ -27,9 +27,9 @@ import { getActiveSigma, setActiveSigma } from "./sigmaRegistry";
 export const EGO_ID = "__ego__";
 
 const DIM_NODE = "#e5e7eb";
-const EDGE_COLOR = "rgba(100, 116, 139, 0.4)";
+const EDGE_COLOR = "rgba(71, 85, 105, 0.5)";
 const EDGE_FOCUS = "rgba(31, 41, 55, 0.65)";
-const EGO_EDGE = "rgba(148, 163, 184, 0.10)";
+const EGO_EDGE = "rgba(148, 163, 184, 0.35)";
 const BRIDGE_BORDER = "#111827";
 const MAX_FORCED_LABELS = 40;
 
