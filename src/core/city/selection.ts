@@ -36,7 +36,10 @@ export function toSelectedView(entity: CityEntity): SelectedEntityView {
         ]
       : [
           { label: "Width", value: m(entity.width) },
-          { label: "Length", value: `${entity.lengthM.toLocaleString("en-US")} m` },
+          {
+            label: "Length",
+            value: `${entity.lengthM.toLocaleString("en-US")} m`,
+          },
           { label: "Class", value: entity.roadClass.replace(/_/g, " ") },
         ];
   return {
@@ -46,13 +49,20 @@ export function toSelectedView(entity: CityEntity): SelectedEntityView {
     name: entity.name,
     osmUrl: osmUrl(entity.id),
     physical,
-    properties: Object.entries(entity.properties).map(([k, v]) => [k, display(v)]),
-    tags: Object.entries(entity.tags).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+    properties: Object.entries(entity.properties).map(([k, v]) => [
+      k,
+      display(v),
+    ]),
+    tags: Object.entries(entity.tags).sort(([a], [b]) =>
+      a < b ? -1 : a > b ? 1 : 0,
+    ),
   };
 }
 
 /** id → entity across every loaded area (later areas win on duplicates). */
-export function indexEntities(cities: readonly CityData[]): Map<string, CityEntity> {
+export function indexEntities(
+  cities: readonly CityData[],
+): Map<string, CityEntity> {
   const index = new Map<string, CityEntity>();
   for (const c of cities) {
     for (const b of c.buildings) index.set(b.id, b);

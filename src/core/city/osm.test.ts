@@ -39,7 +39,12 @@ const FIXTURE: OverpassResponse = {
     {
       type: "way",
       id: 1,
-      tags: { building: "office", height: "42 m", name: "Tower", start_date: "c. 1998" },
+      tags: {
+        building: "office",
+        height: "42 m",
+        name: "Tower",
+        start_date: "c. 1998",
+      },
       geometry: square(13.371, 52.501, 0.001),
     },
     {
@@ -51,7 +56,11 @@ const FIXTURE: OverpassResponse = {
     {
       type: "way",
       id: 3,
-      tags: { building: "house", "addr:housenumber": "7", "addr:street": "Main St" },
+      tags: {
+        building: "house",
+        "addr:housenumber": "7",
+        "addr:street": "Main St",
+      },
       geometry: square(13.375, 52.501, 0.0002),
     },
     // Underground garage under the tower: skipped.
@@ -65,21 +74,38 @@ const FIXTURE: OverpassResponse = {
     {
       type: "relation",
       id: 10,
-      tags: { type: "multipolygon", building: "apartments", "building:levels": "6" },
+      tags: {
+        type: "multipolygon",
+        building: "apartments",
+        "building:levels": "6",
+      },
       members: [
         {
           type: "way",
           ref: 100,
           role: "outer",
-          geometry: [pt(13.376, 52.502), pt(13.378, 52.502), pt(13.378, 52.504)],
+          geometry: [
+            pt(13.376, 52.502),
+            pt(13.378, 52.502),
+            pt(13.378, 52.504),
+          ],
         },
         {
           type: "way",
           ref: 101,
           role: "outer",
-          geometry: [pt(13.376, 52.502), pt(13.376, 52.504), pt(13.378, 52.504)],
+          geometry: [
+            pt(13.376, 52.502),
+            pt(13.376, 52.504),
+            pt(13.378, 52.504),
+          ],
         },
-        { type: "way", ref: 102, role: "inner", geometry: square(13.3765, 52.5025, 0.0005) },
+        {
+          type: "way",
+          ref: 102,
+          role: "inner",
+          geometry: square(13.3765, 52.5025, 0.0005),
+        },
       ],
     },
     // Two separate outers: still one entity.
@@ -88,16 +114,38 @@ const FIXTURE: OverpassResponse = {
       id: 11,
       tags: { type: "multipolygon", building: "roof", height: "8" },
       members: [
-        { type: "way", ref: 110, role: "outer", geometry: square(13.371, 52.508, 0.0003) },
-        { type: "way", ref: 111, role: "outer", geometry: square(13.372, 52.508, 0.0003) },
+        {
+          type: "way",
+          ref: 110,
+          role: "outer",
+          geometry: square(13.371, 52.508, 0.0003),
+        },
+        {
+          type: "way",
+          ref: 111,
+          role: "outer",
+          geometry: square(13.372, 52.508, 0.0003),
+        },
       ],
     },
     // Road leaving and re-entering the bbox → two runs.
     {
       type: "way",
       id: 20,
-      tags: { highway: "primary", name: "Potsdamer Straße", lanes: "3", oneway: "yes" },
-      geometry: [pt(13.371, 52.505), pt(13.372, 52.505), null, null, pt(13.374, 52.505), pt(13.375, 52.505)],
+      tags: {
+        highway: "primary",
+        name: "Potsdamer Straße",
+        lanes: "3",
+        oneway: "yes",
+      },
+      geometry: [
+        pt(13.371, 52.505),
+        pt(13.372, 52.505),
+        null,
+        null,
+        pt(13.374, 52.505),
+        pt(13.375, 52.505),
+      ],
     },
     {
       type: "way",
@@ -106,7 +154,12 @@ const FIXTURE: OverpassResponse = {
       geometry: [pt(13.371, 52.506), pt(13.372, 52.506)],
     },
     // Single point after clipping: no usable geometry.
-    { type: "way", id: 22, tags: { highway: "service" }, geometry: [pt(13.371, 52.507), null] },
+    {
+      type: "way",
+      id: 22,
+      tags: { highway: "service" },
+      geometry: [pt(13.371, 52.507), null],
+    },
   ],
 };
 
@@ -128,15 +181,22 @@ describe("parseLength", () => {
 
 describe("estimateHeight / estimateRoadWidth", () => {
   it("prefers height, then levels × 3.2 m, then a per-type default", () => {
-    expect(estimateHeight({ building: "yes", height: "30", "building:levels": "2" })).toEqual({
+    expect(
+      estimateHeight({ building: "yes", height: "30", "building:levels": "2" }),
+    ).toEqual({
       height: 30,
       source: "height",
     });
-    expect(estimateHeight({ building: "yes", "building:levels": "4" })).toEqual({
-      height: 12.8,
-      source: "levels",
+    expect(estimateHeight({ building: "yes", "building:levels": "4" })).toEqual(
+      {
+        height: 12.8,
+        source: "levels",
+      },
+    );
+    expect(estimateHeight({ building: "house" })).toEqual({
+      height: 7,
+      source: "default",
     });
-    expect(estimateHeight({ building: "house" })).toEqual({ height: 7, source: "default" });
     expect(estimateHeight({ building: "yes" }).source).toBe("default");
   });
 
@@ -157,7 +217,10 @@ describe("assembleRings", () => {
     const rings = assembleRings([
       [a, b, c],
       [a, d, c], // reversed relative to the ring direction
-      [[5, 5], [6, 6]], // dangling
+      [
+        [5, 5],
+        [6, 6],
+      ], // dangling
     ]);
     expect(rings).toHaveLength(1);
     expect(rings[0]).toEqual([a, b, c, d, a]);
@@ -202,10 +265,16 @@ describe("parseOverpass", () => {
       heightSource: "height",
       minHeight: 0,
     });
-    expect(tower?.properties).toMatchObject({ building_type: "office", year_built: 1998 });
+    expect(tower?.properties).toMatchObject({
+      building_type: "office",
+      year_built: 1998,
+    });
     expect(tower?.properties.footprint_m2).toBeGreaterThan(7000);
 
-    expect(byId.get("way/2")).toMatchObject({ height: 19.2, heightSource: "levels" });
+    expect(byId.get("way/2")).toMatchObject({
+      height: 19.2,
+      heightSource: "levels",
+    });
     expect(byId.get("way/2")?.properties.building_type).toBe("unspecified");
     expect(byId.get("way/3")).toMatchObject({ name: "7 Main St", height: 7 });
   });
@@ -251,14 +320,26 @@ describe("toSelectedView", () => {
       id: "way/1",
       osmUrl: "https://www.openstreetmap.org/way/1",
     });
-    expect(v.physical[0]).toEqual({ label: "Height", value: "42.0 m (tagged)" });
-    expect(v.tags.map(([k]) => k)).toEqual(["building", "height", "name", "start_date"]);
+    expect(v.physical[0]).toEqual({
+      label: "Height",
+      value: "42.0 m (tagged)",
+    });
+    expect(v.tags.map(([k]) => k)).toEqual([
+      "building",
+      "height",
+      "name",
+      "start_date",
+    ]);
   });
 
   it("formats a road", () => {
     const v = toSelectedView(byId.get("way/20")!);
     expect(v.kindLabel).toBe("Road");
-    expect(v.physical.map((p) => p.label)).toEqual(["Width", "Length", "Class"]);
+    expect(v.physical.map((p) => p.label)).toEqual([
+      "Width",
+      "Length",
+      "Class",
+    ]);
     expect(v.properties).toContainEqual(["oneway", "yes"]);
   });
 });

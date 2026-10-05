@@ -72,7 +72,10 @@ export function CityInspectionPanel({ id }: { id: string }) {
     [order, cities],
   );
   const entity = index.get(id);
-  const view = useMemo(() => (entity ? toSelectedView(entity) : null), [entity]);
+  const view = useMemo(
+    () => (entity ? toSelectedView(entity) : null),
+    [entity],
+  );
   if (!view) return null;
 
   const isBuilding = view.kind === "building";

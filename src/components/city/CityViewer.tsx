@@ -67,7 +67,9 @@ function buildParts(cities: readonly CityData[]) {
           entityId: b.id,
           name: b.name,
           polygon: polygon.map((ring) =>
-            ring.map(([x, y]) => [x, y, b.minHeight] as [number, number, number]),
+            ring.map(
+              ([x, y]) => [x, y, b.minHeight] as [number, number, number],
+            ),
           ),
           elevation: b.height - b.minHeight,
         });
@@ -78,7 +80,13 @@ function buildParts(cities: readonly CityData[]) {
       seen.add(r.id);
       const tunnel = r.properties.tunnel === true;
       for (const path of r.paths)
-        roads.push({ entityId: r.id, name: r.name, path, width: r.width, tunnel });
+        roads.push({
+          entityId: r.id,
+          name: r.name,
+          path,
+          width: r.width,
+          tunnel,
+        });
     }
   }
   return { buildings, roads };
@@ -115,10 +123,16 @@ function viewFromTarget(target: CameraTarget | null): MapViewState {
 
 const isTyping = (el: EventTarget | null) =>
   el instanceof HTMLElement &&
-  (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
+  (el.isContentEditable ||
+    ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
 
-const cursor = ({ isDragging, isHovering }: { isDragging: boolean; isHovering: boolean }) =>
-  isDragging ? "grabbing" : isHovering ? "pointer" : "grab";
+const cursor = ({
+  isDragging,
+  isHovering,
+}: {
+  isDragging: boolean;
+  isHovering: boolean;
+}) => (isDragging ? "grabbing" : isHovering ? "pointer" : "grab");
 
 const tooltip = ({ object, layer }: PickingInfo<BuildingPart | RoadPart>) =>
   object
@@ -160,7 +174,10 @@ export function CityViewer() {
       bearing: camera.bearing ?? vs.bearing,
       pitch: camera.pitch ?? vs.pitch,
       transitionDuration: "auto",
-      transitionInterpolator: new FlyToInterpolator({ speed: 1.8, maxDuration: 4000 }),
+      transitionInterpolator: new FlyToInterpolator({
+        speed: 1.8,
+        maxDuration: 4000,
+      }),
     }));
   }, [camera]);
 
@@ -172,7 +189,10 @@ export function CityViewer() {
     return () => window.removeEventListener("keydown", onKey);
   }, [select]);
 
-  const cities = useMemo(() => order.map((id) => cityMap[id]), [order, cityMap]);
+  const cities = useMemo(
+    () => order.map((id) => cityMap[id]),
+    [order, cityMap],
+  );
   const parts = useMemo(() => buildParts(cities), [cities]);
 
   const layers = useMemo(
@@ -187,7 +207,11 @@ export function CityViewer() {
         capRounded: true,
         jointRounded: true,
         getColor: (d) =>
-          d.entityId === selectedId ? ROAD_SELECTED : d.tunnel ? ROAD_TUNNEL : ROAD,
+          d.entityId === selectedId
+            ? ROAD_SELECTED
+            : d.tunnel
+              ? ROAD_TUNNEL
+              : ROAD,
         updateTriggers: { getColor: [selectedId] },
         pickable: true,
         autoHighlight: true,
@@ -225,7 +249,11 @@ export function CityViewer() {
         ...vs,
         ...patch,
         transitionDuration: 300,
-        transitionInterpolator: new LinearInterpolator(["zoom", "pitch", "bearing"]),
+        transitionInterpolator: new LinearInterpolator([
+          "zoom",
+          "pitch",
+          "bearing",
+        ]),
       })),
     [],
   );
@@ -234,7 +262,9 @@ export function CityViewer() {
     <div className="relative h-full w-full overflow-hidden">
       <DeckGL
         viewState={viewState}
-        onViewStateChange={({ viewState: next }) => setViewState(next as MapViewState)}
+        onViewStateChange={({ viewState: next }) =>
+          setViewState(next as MapViewState)
+        }
         controller={{ dragRotate: true, touchRotate: true, keyboard: true }}
         layers={layers}
         effects={EFFECTS}

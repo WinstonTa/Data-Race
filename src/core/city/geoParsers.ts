@@ -27,11 +27,7 @@ const HEMI_RE = new RegExp(
 const SHORT_LINK_RE = /(maps\.app\.goo\.gl|goo\.gl\/maps|g\.co\/kgs)/i;
 const QUERY_KEYS = ["q", "ll", "query", "center", "destination"];
 
-function build(
-  lat: number,
-  lng: number,
-  zoom?: number,
-): LocationParse {
+function build(lat: number, lng: number, zoom?: number): LocationParse {
   if (!Number.isFinite(lat) || !Number.isFinite(lng))
     return { ok: false, reason: "Those coordinates aren't numbers." };
   if (Math.abs(lat) > MAX_LAT)
@@ -62,7 +58,11 @@ function parsePair(text: string): LocationParse | null {
   return null;
 }
 
-function zoomFrom(value: string | undefined, unit: string | undefined, lat: number) {
+function zoomFrom(
+  value: string | undefined,
+  unit: string | undefined,
+  lat: number,
+) {
   if (value === undefined || unit === undefined) return undefined;
   const n = Number(value);
   if (unit === "z") return Math.min(22, Math.max(0, n));

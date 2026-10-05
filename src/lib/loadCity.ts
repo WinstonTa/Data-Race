@@ -40,7 +40,10 @@ export async function openPreset(preset: CityPreset): Promise<void> {
 
   const loaded = store.cities[preset.id];
   if (loaded) {
-    store.setStatus({ state: "ready", message: `${loaded.name} · ${count(loaded)}` });
+    store.setStatus({
+      state: "ready",
+      message: `${loaded.name} · ${count(loaded)}`,
+    });
     return;
   }
   const ctl = begin();
@@ -51,7 +54,10 @@ export async function openPreset(preset: CityPreset): Promise<void> {
     const city = (await res.json()) as CityData;
     store.addCity(city);
     if (isCurrent(ctl))
-      store.setStatus({ state: "ready", message: `${city.name} · ${count(city)}` });
+      store.setStatus({
+        state: "ready",
+        message: `${city.name} · ${count(city)}`,
+      });
   } catch (err) {
     if (!isCurrent(ctl)) return;
     store.setStatus({
@@ -65,7 +71,10 @@ export async function openPreset(preset: CityPreset): Promise<void> {
  * Go to an arbitrary point. Inside an already-loaded area we just fly;
  * otherwise we fetch a ~1 km square around it from Overpass.
  */
-export async function openLocation(center: LngLat, zoom?: number): Promise<void> {
+export async function openLocation(
+  center: LngLat,
+  zoom?: number,
+): Promise<void> {
   const store = useCityStore.getState();
   store.setPresetId(null);
   store.flyTo({ center, zoom: zoom ?? 16.5, pitch: DEFAULT_PITCH });
@@ -74,12 +83,18 @@ export async function openLocation(center: LngLat, zoom?: number): Promise<void>
     .map((id) => store.cities[id])
     .find((c) => bboxContains(c.bbox, center));
   if (covering) {
-    store.setStatus({ state: "ready", message: `${covering.name} · ${count(covering)}` });
+    store.setStatus({
+      state: "ready",
+      message: `${covering.name} · ${count(covering)}`,
+    });
     return;
   }
 
   const ctl = begin();
-  store.setStatus({ state: "loading", message: "Loading buildings from OpenStreetMap…" });
+  store.setStatus({
+    state: "loading",
+    message: "Loading buildings from OpenStreetMap…",
+  });
   const timer = setTimeout(() => ctl.abort("timeout"), LIVE_TIMEOUT_MS);
   try {
     const city = await fetchLiveArea(center, ctl.signal);
@@ -119,7 +134,9 @@ export async function fetchLiveArea(
     signal,
   });
   if (res.status === 429 || res.status === 504)
-    throw new Error("OpenStreetMap (Overpass) is busy. Wait a minute and retry.");
+    throw new Error(
+      "OpenStreetMap (Overpass) is busy. Wait a minute and retry.",
+    );
   if (!res.ok) throw new Error(`Overpass error: HTTP ${res.status}`);
   const json = (await res.json()) as OverpassResponse;
   const label = `${center[1].toFixed(4)}, ${center[0].toFixed(4)}`;

@@ -19,7 +19,8 @@ export function haversineM(a: LngLat, b: LngLat): number {
 /** Sum of segment lengths along a path, metres. */
 export function pathLengthM(path: readonly LngLat[]): number {
   let total = 0;
-  for (let i = 1; i < path.length; i++) total += haversineM(path[i - 1], path[i]);
+  for (let i = 1; i < path.length; i++)
+    total += haversineM(path[i - 1], path[i]);
   return total;
 }
 
@@ -36,7 +37,9 @@ export function bboxAround(center: LngLat, halfM: number): BBox {
 }
 
 export function bboxContains(bbox: BBox, p: LngLat): boolean {
-  return p[0] >= bbox[0] && p[0] <= bbox[2] && p[1] >= bbox[1] && p[1] <= bbox[3];
+  return (
+    p[0] >= bbox[0] && p[0] <= bbox[2] && p[1] >= bbox[1] && p[1] <= bbox[3]
+  );
 }
 
 /** Round to 6 decimal places (≈ 10 cm) — keeps snapshots compact. */
@@ -97,7 +100,10 @@ export function pointInRing(p: LngLat, ring: Ring): boolean {
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
     const [xi, yi] = ring[i];
     const [xj, yj] = ring[j];
-    if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi)
+    if (
+      yi > p[1] !== yj > p[1] &&
+      p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi
+    )
       inside = !inside;
   }
   return inside;

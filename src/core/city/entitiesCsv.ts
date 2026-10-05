@@ -27,7 +27,10 @@ const str = (v: string | number | boolean | undefined) =>
 
 /** Midpoint vertex of the longest run — a stable anchor for a road. */
 function roadAnchor(paths: LngLat[][]): LngLat {
-  const longest = paths.reduce((a, b) => (b.length > a.length ? b : a), paths[0]);
+  const longest = paths.reduce(
+    (a, b) => (b.length > a.length ? b : a),
+    paths[0],
+  );
   return longest[Math.floor(longest.length / 2)];
 }
 

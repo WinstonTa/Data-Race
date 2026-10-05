@@ -1,9 +1,4 @@
-import {
-  pathLengthM,
-  pointInRing,
-  ringAreaM2,
-  roundCoord,
-} from "./geo";
+import { pathLengthM, pointInRing, ringAreaM2, roundCoord } from "./geo";
 import type {
   BBox,
   BuildingEntity,
@@ -62,23 +57,25 @@ export function buildOverpassQuery(bbox: BBox, timeoutS = 60): string {
 
 type OsmPoint = { lat: number; lon: number } | null;
 
-interface OsmWay {
-  type: "way";
+/** One element of an Overpass JSON response (`out geom` flavour). */
+export interface OverpassElement {
+  type: string;
   id: number;
   tags?: Record<string, string>;
+  /** Ways: positions, `null` where clipped away by `geom(bbox)`. */
   geometry?: OsmPoint[];
-}
-
-interface OsmRelation {
-  type: "relation";
-  id: number;
-  tags?: Record<string, string>;
-  members?: { type: string; ref: number; role: string; geometry?: OsmPoint[] }[];
+  /** Relations (`out body geom`): member ways with their geometry. */
+  members?: {
+    type: string;
+    ref: number;
+    role: string;
+    geometry?: OsmPoint[];
+  }[];
 }
 
 export interface OverpassResponse {
   osm3s?: { timestamp_osm_base?: string };
-  elements: ({ type: string; id: number } & Partial<OsmWay & OsmRelation>)[];
+  elements: OverpassElement[];
 }
 
 /* ------------------------------------------------------------- numbers -- */
@@ -90,8 +87,12 @@ export interface OverpassResponse {
 export function parseLength(raw: string | undefined): number | null {
   if (!raw) return null;
   const s = raw.trim().toLowerCase().replace(",", ".");
-  const feet = /^(\d+(?:\.\d+)?)\s*(?:'|ft|feet)\s*(?:(\d+(?:\.\d+)?)\s*(?:"|in))?$/.exec(s);
-  if (feet) return round1(Number(feet[1]) * 0.3048 + Number(feet[2] ?? 0) * 0.0254);
+  const feet =
+    /^(\d+(?:\.\d+)?)\s*(?:'|ft|feet)\s*(?:(\d+(?:\.\d+)?)\s*(?:"|in))?$/.exec(
+      s,
+    );
+  if (feet)
+    return round1(Number(feet[1]) * 0.3048 + Number(feet[2] ?? 0) * 0.0254);
   const metres = /^(\d+(?:\.\d+)?)\s*(?:m|meters?|metres?)?$/.exec(s);
   if (metres) return round1(Number(metres[1]));
   return null;
@@ -146,12 +147,15 @@ export function estimateHeight(tags: Record<string, string>): {
   source: HeightSource;
 } {
   const h = parseLength(tags.height ?? tags["building:height"]);
-  if (h !== null && h > 0) return { height: Math.max(h, MIN_HEIGHT_M), source: "height" };
+  if (h !== null && h > 0)
+    return { height: Math.max(h, MIN_HEIGHT_M), source: "height" };
   const levels = parseNumberTag(tags["building:levels"]);
   if (levels !== null && levels > 0) {
     const roof = parseNumberTag(tags["roof:levels"]) ?? 0;
     return {
-      height: round1(Math.max((levels + roof) * METRES_PER_LEVEL, MIN_HEIGHT_M)),
+      height: round1(
+        Math.max((levels + roof) * METRES_PER_LEVEL, MIN_HEIGHT_M),
+      ),
       source: "levels",
     };
   }
@@ -162,7 +166,10 @@ export function estimateHeight(tags: Record<string, string>): {
 }
 
 /** Base of the extrusion. Untagged `building=roof` becomes a 1 m canopy slab. */
-function estimateMinHeight(tags: Record<string, string>, height: number): number {
+function estimateMinHeight(
+  tags: Record<string, string>,
+  height: number,
+): number {
   const explicit =
     parseLength(tags.min_height) ??
     (parseNumberTag(tags["building:min_level"]) ?? 0) * METRES_PER_LEVEL;
@@ -225,7 +232,8 @@ export function entityName(
 /** Tag keys that are editor bookkeeping, not attributes. */
 const NOISE_TAG = /^(source|note|fixme|check_date|created_by|survey)(:|$)/i;
 /** Localised names balloon snapshots (Moscow, Paris landmarks); keep English. */
-const LOCALISED_NAME = /^(name|alt_name|old_name|official_name|short_name):(?!en$)/;
+const LOCALISED_NAME =
+  /^(name|alt_name|old_name|official_name|short_name):(?!en$)/;
 
 export function cleanTags(tags: Record<string, string> | undefined) {
   const out: Record<string, string> = {};
@@ -249,7 +257,8 @@ function compact(
   entries: [string, string | number | boolean | null | undefined][],
 ): EntityProperties {
   const out: EntityProperties = {};
-  for (const [k, v] of entries) if (v !== null && v !== undefined && v !== "") out[k] = v;
+  for (const [k, v] of entries)
+    if (v !== null && v !== undefined && v !== "") out[k] = v;
   return out;
 }
 
@@ -277,7 +286,8 @@ export function splitRuns(geometry: OsmPoint[] | undefined): LngLat[][] {
 }
 
 const samePoint = (a: LngLat, b: LngLat) => a[0] === b[0] && a[1] === b[1];
-const isClosed = (r: LngLat[]) => r.length >= 4 && samePoint(r[0], r[r.length - 1]);
+const isClosed = (r: LngLat[]) =>
+  r.length >= 4 && samePoint(r[0], r[r.length - 1]);
 
 /**
  * Join multipolygon member ways into closed rings by matching endpoints
@@ -310,7 +320,7 @@ export function assembleRings(segments: LngLat[][]): Ring[] {
 }
 
 /** Outer rings each become a polygon; inner rings go to the outer containing them. */
-function relationPolygons(rel: OsmRelation): Polygon[] {
+function relationPolygons(rel: OverpassElement): Polygon[] {
   const outers: LngLat[][] = [];
   const inners: LngLat[][] = [];
   for (const m of rel.members ?? []) {
@@ -339,7 +349,9 @@ function buildBuilding(
   const minHeight = estimateMinHeight(rawTags, height);
   const footprint = polygons.reduce(
     (sum, p) =>
-      sum + ringAreaM2(p[0]) - p.slice(1).reduce((h, r) => h + ringAreaM2(r), 0),
+      sum +
+      ringAreaM2(p[0]) -
+      p.slice(1).reduce((h, r) => h + ringAreaM2(r), 0),
     0,
   );
   return {
@@ -351,12 +363,18 @@ function buildBuilding(
     minHeight: round1(minHeight),
     heightSource: source,
     properties: compact([
-      ["building_type", rawTags.building === "yes" ? "unspecified" : rawTags.building],
+      [
+        "building_type",
+        rawTags.building === "yes" ? "unspecified" : rawTags.building,
+      ],
       ["levels", parseNumberTag(rawTags["building:levels"])],
       ["year_built", yearBuilt(rawTags)],
       ["address", address(rawTags)],
       ["footprint_m2", Math.round(footprint)],
-      ["use", rawTags.amenity ?? rawTags.shop ?? rawTags.office ?? rawTags.tourism],
+      [
+        "use",
+        rawTags.amenity ?? rawTags.shop ?? rawTags.office ?? rawTags.tourism,
+      ],
       ["architect", rawTags.architect],
       ["operator", rawTags.operator],
       ["wikidata", rawTags.wikidata],
@@ -365,7 +383,7 @@ function buildBuilding(
   };
 }
 
-function buildRoad(way: OsmWay, paths: LngLat[][]): RoadEntity {
+function buildRoad(way: OverpassElement, paths: LngLat[][]): RoadEntity {
   const raw = way.tags ?? {};
   const lengthM = Math.round(paths.reduce((s, p) => s + pathLengthM(p), 0));
   return {
@@ -417,7 +435,10 @@ export interface CityMeta {
  * Duplicate elements (same id twice in a response) are kept once; output is
  * sorted by id so snapshots diff cleanly.
  */
-export function parseOverpass(json: OverpassResponse, meta: CityMeta): CityData {
+export function parseOverpass(
+  json: OverpassResponse,
+  meta: CityMeta,
+): CityData {
   const buildings = new Map<string, BuildingEntity>();
   const roads = new Map<string, RoadEntity>();
 
@@ -428,13 +449,14 @@ export function parseOverpass(json: OverpassResponse, meta: CityMeta): CityData 
     if (isBuilding && isUnderground(tags)) continue;
     if (el.type === "way" && isBuilding) {
       const ring = splitRuns(el.geometry)[0];
-      if (ring && ring.length >= 3) buildings.set(id, buildBuilding(id, tags, [[ring]]));
+      if (ring && ring.length >= 3)
+        buildings.set(id, buildBuilding(id, tags, [[ring]]));
     } else if (el.type === "relation" && isBuilding) {
-      const polygons = relationPolygons(el as OsmRelation);
+      const polygons = relationPolygons(el);
       if (polygons.length) buildings.set(id, buildBuilding(id, tags, polygons));
     } else if (el.type === "way" && tags.highway) {
       const paths = splitRuns(el.geometry);
-      if (paths.length) roads.set(id, buildRoad(el as OsmWay, paths));
+      if (paths.length) roads.set(id, buildRoad(el, paths));
     }
   }
 
