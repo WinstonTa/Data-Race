@@ -1,6 +1,6 @@
 "use client";
 
-import { ChartBarBig, Waypoints } from "lucide-react";
+import { Building2, ChartBarBig, Waypoints } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -8,9 +8,10 @@ import { cn } from "@/lib/utils";
 const LINKS = [
   { href: "/", label: "Bar race", icon: ChartBarBig },
   { href: "/graph", label: "Friend graph", icon: Waypoints },
+  { href: "/city", label: "City 3D", icon: Building2, experimental: true },
 ];
 
-/** Switch between the bar-race and friend-graph workspaces. */
+/** Switch between the bar-race, friend-graph and city workspaces. */
 export function AppNav() {
   const pathname = usePathname();
   const active = (href: string) =>
@@ -18,7 +19,7 @@ export function AppNav() {
 
   return (
     <nav className="bg-muted inline-flex rounded-lg p-1 text-sm">
-      {LINKS.map(({ href, label, icon: Icon }) => (
+      {LINKS.map(({ href, label, icon: Icon, experimental }) => (
         <Link
           key={href}
           href={href}
@@ -32,6 +33,11 @@ export function AppNav() {
         >
           <Icon className="size-4" />
           {label}
+          {experimental ? (
+            <span className="rounded bg-amber-500/15 px-1 text-[10px] font-semibold tracking-wide text-amber-600 uppercase dark:text-amber-400">
+              Beta
+            </span>
+          ) : null}
         </Link>
       ))}
     </nav>
