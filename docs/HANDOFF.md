@@ -1,6 +1,6 @@
 # Data Race — Handoff Brief
 
-_Last updated 2026-10-03. Read this before touching code; it replaces an hour of repo spelunking._
+_Last updated 2026-10-04. Read this before touching code; it replaces an hour of repo spelunking._
 
 ## 1. What this is
 
@@ -9,6 +9,8 @@ _Last updated 2026-10-03. Read this before touching code; it replaces an hour of
 The MVP is **feature-complete and verified** (see §6). Remaining work is polish, deployment, and whatever new features Winston asks for.
 
 A second, independent workspace lives at **`/graph`** (added 2026-10-03, branch `feature/graphview`): drop a Discord friends **edge-list CSV** → force-directed network with Louvain groups, betweenness "bridges", per-friend metrics, search, sortable table, PNG + metrics-CSV export. It shares only UI primitives, `parseGrid`, `idbStorage`, `downloadBlob` and the palette with the bar race.
+
+A third, **experimental** workspace lives at **`/city`** (added 2026-10-04, branch `experiment/city_entity_3D`): a deck.gl 3D city where every OpenStreetMap building and road is a discrete, pickable entity with a string id (`way/123`) for downstream joins. 7 bundled downtown snapshots + live Overpass fetch for pasted Google Maps URLs / coordinates; inspection panel; Entities CSV export. Session-only state, no persistence.
 
 ## 2. Locked product decisions (do not re-litigate)
 
@@ -28,6 +30,7 @@ A second, independent workspace lives at **`/graph`** (added 2026-10-03, branch 
 | Video lib    | `mediabunny` (successor to `mp4-muxer`). Never `captureStream`/`MediaRecorder`.                                                                                                                                                                                                                                                                                                                           |
 | Table lib    | Plain `<table>` + click-to-edit cells, 50 rows/page, no virtualisation dep. TanStack Table was dropped (v9 API rewrite).                                                                                                                                                                                                                                                                                  |
 | Grid model   | The raw CSV grid + `ColumnMapping` are the source of truth (persisted, in project file v2); `Dataset` is derived via `buildDataset`.                                                                                                                                                                                                                                                                      |
+| City 3D      | Separate `/city` route, experimental ("Beta" tab). Entities = OSM `building` ways/multipolygons + `highway` ways (15 road classes); id = `way/<n>` / `relation/<n>` **string**. Presets (Paris, Berlin, Moscow, Long Beach, LA, SF, Boston) are bundled ±600 m snapshots; anything else is a live ±500 m Overpass fetch. Basemap = OpenFreeMap dark (no key). Joins = Entities CSV export only (no metric import yet). Session-only zustand store, no IDB. deck.gl + MapLibre, not Three.js. |
 | Friend graph | Separate `/graph` route. Input is a Discord **edge list** (`Friend_ID…Mutual_DisplayName`); wide-only applies to the bar race only. Sigma.js v3 + graphology. Ego (account owner) excluded from metrics; "Show me" adds a visual-only node. Min-degree slider is visibility-only (metrics on the full graph). Auto-saved to IDB key `data-race-graph`; exports = PNG of the view + metrics CSV. No video. |
 
 ## 3. Tech stack
@@ -39,6 +42,7 @@ A second, independent workspace lives at **`/graph`** (added 2026-10-03, branch 
 - **mediabunny** (WebCodecs `VideoEncoder` + MP4/WebM muxing, handles backpressure)
 - **react-dropzone**, **Vitest 5**, Prettier (+ tailwind plugin), ESLint (next config)
 - Friend graph: **graphology** (+ `-communities-louvain`, `-metrics`, `-layout`, `-layout-forceatlas2`), **sigma 3**, `@sigma/node-border` (bridge rings), `@sigma/export-image` (PNG)
+- City 3D: **deck.gl 9.4** (`@deck.gl/core`, `/layers`, `/react`, `/widgets` — the last is a required peer of `/react`), **maplibre-gl 5** (NOT 6, see §7 #23) via **react-map-gl 8** (`react-map-gl/maplibre`); **tsx** (dev) runs the snapshot script
 - **pnpm 12**, deploy target Vercel
 
 ## 4. Architecture in one picture
@@ -80,6 +84,9 @@ Data-Race/
 ├── public/fonts/                Inter variable woff2 (latin + latin-ext) + license.
 │                                Served from /public so the WORKER can load the same
 │                                files via FontFace. Family name: "Inter Chart".
+├── public/cities/<id>.json      City 3D snapshots (CityData JSON, OSM © ODbL). Generated.
+├── scripts/fetch-city-snapshots.ts  `pnpm city:snapshots [id…]` (tsx): Overpass →
+│                                parseOverpass → public/cities. Backs off on 429/504.
 └── src/
     ├── app/
     │   ├── layout.tsx           Geist UI font vars, <TooltipProvider>, metadata
@@ -125,6 +132,22 @@ Data-Race/
     │   │   ├── fonts.ts         CHART_FONT_FAMILY, chartFont(weight,size), loadChartFonts(fontSet, origin)
     │   │   └── palette.ts       DEFAULT_PALETTE (20 colors), assignColors(entities)
     │   ├── random.ts            mulberry32(seed) PRNG (sample data + seeded Louvain)
+    │   ├── city/                ★ City 3D, pure + tested. Internal imports are RELATIVE (the tsx
+    │   │   │                    snapshot script imports these too). Coordinates are [lng, lat].
+    │   │   ├── types.ts         BuildingEntity {polygons: Polygon[] (outer+holes each), height,
+    │   │   │                    minHeight, heightSource, properties, tags}, RoadEntity {paths (runs),
+    │   │   │                    width, lengthM, roadClass}, CityData, SelectedEntityView
+    │   │   ├── geo.ts           haversineM, pathLengthM, bboxAround, bboxContains, roundCoord (6 dp),
+    │   │   │                    zoomFromAltitudeM, ringCentroid, ringAreaM2, pointInRing
+    │   │   ├── geoParsers.ts    parseLocationInput(text) → {ok, latitude, longitude, zoom?} |
+    │   │   │                    {ok:false, reason}: @lat,lng,16z / 500m, !3d!4d, ?q=/ll=/query=,
+    │   │   │                    path coords, plain pairs, N/S/E/W; short links rejected with a reason
+    │   │   ├── osm.ts           buildOverpassQuery(bbox) (buildings whole, roads clipped via
+    │   │   │                    geom(bbox)), parseOverpass(json, meta) → CityData, estimateHeight,
+    │   │   │                    estimateRoadWidth, assembleRings (multipolygon members), cleanTags,
+    │   │   │                    underground (layer<0) footprints skipped
+    │   │   ├── selection.ts     toSelectedView(entity), indexEntities(cities), osmUrl(id)
+    │   │   └── entitiesCsv.ts   entitiesToGrid(cities) → Grid (deduped by id)
     │   ├── graph/               ★ Friend graph, pure + tested
     │   │   ├── types.ts         FriendNode/FriendEdge/GraphData (ids are STRINGS), NodeMetrics,
     │   │   │                    CommunityInfo, GraphSummary, GraphAnalysis, nodeLabel()
@@ -161,6 +184,8 @@ Data-Race/
     │   │                        skipHydration). Session-only: analysis, selectedId, focusNonce
     │   │                        (camera → node), layoutNonce (re-run layout), layoutRunning.
     │   ├── usePlaybackStore.ts  t (period units), playing, speed. NOT persisted.
+    │   ├── useCityStore.ts      City 3D, session-only: cities{id→CityData}, order, presetId, status,
+    │   │                        selectedId, camera {center, zoom?, bearing?, pitch?, nonce}.
     │   └── useAssetStore.ts     bitmaps: Map<imageId, ImageBitmap> (renderer input) +
     │                            urls: Map<imageId, objectURL> (table thumbnails). Closes/revokes on replace.
     │
@@ -175,6 +200,9 @@ Data-Race/
     │   ├── loadCsv.ts           loadCsvText(text, fileName): parseGrid → store.loadSource → rewind
     │   │                        playback. Used by the dropzone, "Load sample" and first-visit boot.
     │   ├── loadEdgeList.ts      loadEdgeListText(text, name): parseGrid → parseEdgeList → graph store
+    │   ├── loadCity.ts          openPreset(preset) (fly + fetch /cities/<id>.json once),
+    │   │                        openLocation(center, zoom?) (fly; Overpass fetch unless inside a loaded
+    │   │                        bbox; 30 s timeout; newer requests abort older), fetchLiveArea
     │   ├── graphAnalysisClient.ts  analyzeInWorker(data) → {result, cancel} (spawns graph.worker)
     │   ├── exportClient.ts      startVideoExport(job, bitmaps, onProgress) → {result: Promise<Blob>, cancel}.
     │   │                        Spawns the worker (new Worker(new URL('../workers/export.worker.ts',
@@ -185,8 +213,10 @@ Data-Race/
     ├── data/
     │   ├── sampleDataset.ts     Deterministic fictional "coffee chains" CSV (seeded PRNG):
     │   │                        buildSampleCsv(), SAMPLE_FILE_NAME, SAMPLE_SETTINGS
-    │   └── sampleFriendGraph.ts Deterministic fictional Discord export: 61 friends, 5 groups,
-    │                            4 planted bridges, 4 isolates; buildSampleFriendCsv()
+    │   ├── sampleFriendGraph.ts Deterministic fictional Discord export: 61 friends, 5 groups,
+    │   │                        4 planted bridges, 4 isolates; buildSampleFriendCsv()
+    │   └── cityPresets.ts       CITY_PRESETS (7 cities: id, area, center, zoom, bearing, halfSizeM),
+    │                            DEFAULT_CITY_ID ("san-francisco"), snapshotUrl(id)
     │
     └── components/
         ├── ErrorBoundary.tsx    Class boundary with "Try again" / "Reset project"
@@ -243,12 +273,25 @@ Data-Race/
         │   ├── sigmaRegistry.ts Live Sigma instance for PNG export / zoom buttons
         │   └── GraphControls, FriendSearch, NodeDetails, TopLists, SummaryStats, NodeTable,
         │                        GraphExportButtons, GraphWarnings, EdgeListDropzone, graphHooks
+        ├── city/                City 3D workspace (route src/app/city/page.tsx)
+        │   ├── CityWorkspace.tsx  Client boundary (`dark` wrapper, h-dvh), header + Entities CSV,
+        │   │                    boots the default preset once; CityViewer is ssr:false
+        │   ├── CityViewer.tsx   DeckGL (controlled viewState, FlyToInterpolator on camera.nonce) +
+        │   │                    react-map-gl <Map> child. PathLayer roads + extruded PolygonLayer
+        │   │                    buildings built from flattened "parts" (entityId per part);
+        │   │                    selection via getFillColor/getColor + updateTriggers[selectedId];
+        │   │                    LightingEffect; Escape/empty click deselect. Dev-only
+        │   │                    `window.__cityDeck()` returns the Deck instance for debugging.
+        │   ├── CitySearchBar.tsx  Preset <Select> + URL/coords input, error/loading/retry line
+        │   ├── CityInspectionPanel.tsx  Glass drawer: kind badge, copy-id, physical tiles,
+        │   │                    properties, <details> All OSM tags, OSM link
+        │   └── ViewportControls.tsx  Zoom ±, reset north/tilt, 2D/3D
         └── export/
             └── ExportDialog.tsx Tabs: Video (probe plan → fps select → progress/cancel → download)
                                  and PNG snapshot (current t).
 ```
 
-**Tests** (`pnpm test`, 99 passing): `core/parser/*.test.ts` (grid, columnMapping, buildDataset, chartReadyGrid, parseWideCsv, parseNumber), `core/timeline/timeline.test.ts`, `core/render/textCache.test.ts`, `core/graph/{parseEdgeList,metrics}.test.ts`. Pattern: pure functions with fixture data; parser tests inject `idFactory` for deterministic ids.
+**Tests** (`pnpm test`, 128 passing; `core/city/{geoParsers,osm}.test.ts` cover URL formats, OSM parsing, rings, CSV): `core/parser/*.test.ts` (grid, columnMapping, buildDataset, chartReadyGrid, parseWideCsv, parseNumber), `core/timeline/timeline.test.ts`, `core/render/textCache.test.ts`, `core/graph/{parseEdgeList,metrics}.test.ts`. Pattern: pure functions with fixture data; parser tests inject `idFactory` for deterministic ids.
 
 ## 6. Verified so far (2026-09-13, Chrome via the in-app browser)
 
@@ -261,6 +304,8 @@ Data-Race/
 **2026-09-15, column mapping (Chrome via the in-app browser), using the real World Bank GDP export (`API_NY.GDP.MKTP.CD_DS2_en_csv_v2_*.csv`, 270 lines × 71 cols):** auto-mapping picks header row 3, `Country Name`, 66 period columns, leaves `Country Code`/`Indicator Name`/`Indicator Code` + the trailing empty column unused, reports 4 genuinely empty rows and zero non-numeric cells; chart renders 1960→2025. Verified: cell edit to `abc` → red cell + non-numeric warning, edit back clears it; unticking/reticking a period column and swapping the name column keep entity ids and a custom colour; filter "income" + Hide → 11 aggregates drop out of the chart; reload restores grid/mapping/colour/toggles from IDB (persist v2); Save → Open round-trips (575 KB), a v1 project file opens with a synthesised grid; "Edited CSV" = 268×71 with edits, "Chart-ready CSV" = `Name,1960…2025` × 265 rows; sample loads with `confident=true` and no alerts; 211-frame MP4 export still works.
 
 **2026-10-03, friend graph (Chrome via the in-app browser, sample data):** analysis recovers all 5 planted groups (modularity 0.69) and flags the planted bridges; click/search/top-list/table selection opens the drawer and centres the camera with non-neighbours dimmed; click stage deselects; synthetic drag moves + pins a node without selecting it; min-degree 5 → 34 of 61 shown with the summary unchanged; repulsion change re-runs layout; Show me adds the You node + spokes; reload restores graph, positions, settings and colours without re-layout; PNG (1407×1223) and Metrics CSV (header + 61 rows, 18-digit ids intact) captured via a `URL.createObjectURL` hook; `/` ↔ `/graph` round trips leave one Sigma instance and no errors; the static `out/` build runs the analysis worker and the FA2 blob worker. **Not verified:** a real Discord export at scale (~1000 friends).
+
+**2026-10-04, City 3D (Chrome via the in-app browser):** SF renders on load (898 buildings / 688 roads); hover + click select a building (panel shows tagged height, properties, OSM tags; fill turns blue) and a road (width/length/class); Escape and close deselect; all 7 presets load and fly; Google URL `@37.7749,-122.4194,16z` live-fetches Civic Center from Overpass in ~2 s (862 buildings); a pasted point inside a loaded area flies with zero Overpass calls; invalid text / short link show their reasons; Entities CSV = 12,894 rows = unique entities on screen across 8 areas; `/`↔`/graph`↔`/city` round trips leave 2 canvases; static `out/city.html` loads snapshot + basemap with no worker errors. Picking also verified via `__cityDeck().pickObject(s)` because the hidden pane pauses rAF. **Not verified:** Firefox/Safari, touch rotate, very dense live areas (Overpass timeouts).
 
 **Not verified:** WebM fallback and "unsupported" notice paths (only Chrome was available); real browser download UX (downloads were intercepted in the sandbox); Vercel deploy.
 
@@ -289,6 +334,12 @@ Data-Race/
 21. **The FA2 worker snapshots `fixed` at start** and overwrites positions while running, so dragging stops the layout first. Graph structure changes (ego toggle) respawn the FA2 worker automatically.
 22. **Static export prefetch 404s locally.** Next 16 writes nested RSC segment files as folders (`out/graph/__next.graph/__PAGE__.txt`) but requests `/graph/__next.graph.__PAGE__.txt`; a plain `python -m http.server` 404s it (prefetch only, navigation still works). `/graph` is `out/graph.html` locally.
 
+23. **maplibre-gl 6 breaks under Turbopack.** v6 is ESM-only and loads its worker from `new URL('./maplibre-gl-worker.mjs', import.meta.url)`, which 404s once bundled ("Worker failed to load"). v5 inlines the worker as a blob. Stay on `maplibre-gl@^5` until that's solved (or copy the worker into `public/` + `setWorkerUrl`). A running `next dev` keeps the old resolution after a dependency swap; touch the importing file or restart.
+24. **Overpass etiquette.** The public instance rate-limits (429) and times out (504) under load; `pnpm city:snapshots` backs off and retries, and can be run per city (`pnpm city:snapshots boston`). Node's fetch needs a `User-Agent` or Overpass answers 406. Snapshots are 0.3–2.2 MB raw but ~160–240 KB gzipped (Berlin is big because its OSM data is richly tagged).
+25. **OSM modelling quirks.** Some towers also have an underground footprint way (`layer=-1`) that would z-fight; `parseOverpass` skips `layer<0` / `location=underground`. `building=roof` without `min_height` renders as a 1 m slab at the top. `building:part` is ignored (outline height only). deck's extruded polygons take the base from the positions' z, so `min_height` works by giving rings z = minHeight and elevation = height − minHeight.
+26. **Hidden in-app browser pane pauses rAF**, so deck never resizes its canvas (stays 300×150) and screenshots time out. Use `window.__cityDeck().pickObject(s)` / `deck.props.onClick(info)` / DOM reads to verify instead.
+27. Radix `<SelectContent>` portals outside the `.dark` wrapper; it gets `className="dark"` itself so the dropdown uses dark tokens.
+
 ## 8. Suggested next steps (not yet requested — confirm with Winston first)
 
 - Commit the uncommitted work on `feature/mvp`, open PR to `main`, deploy to Vercel.
@@ -296,6 +347,7 @@ Data-Race/
 - Polish candidates: gridline fade when tick set changes; per-category legend; "step" motion toggle; 4K export (needs codec probe at 3840×2160 and bitrate scaling — already parametrised in `exportVideo.ts`); image-URL column support (fetch + CORS).
 - Table editor follow-ups: "no header row" mode; add/delete rows; virtualised rows for very large files; throttled persistence (see §7 #15); a "hide aggregates" preset for World Bank files (their `Metadata_Country_*.csv` has a blank Region for aggregates).
 - Friend graph follow-ups: test a real ~1000-friend export (betweenness + FA2 timing); community renaming; hide-isolates toggle; ego-network view (radius-1 subgraph of one friend); dark-mode canvas colours.
+- City 3D follow-ups: metrics-CSV import joined on entity id → choropleth / height-by-metric; persist last area + camera; `building:part` + roof shapes; terrain; PNG export of the view; MVT tile streaming for city-scale areas; per-city attribution of height confidence (Paris is mostly level-derived, ~30 % estimated).
 - Playwright smoke test for the export path so regressions are caught outside a manual browser session.
 
 ## 9. Commands

@@ -138,6 +138,29 @@ Friend_ID,Friend_Username,Friend_DisplayName,Mutual_ID,Mutual_Username,Mutual_Di
 - You (the account owner) aren't in the file; the **Show me** toggle draws a
   "You" node for context without affecting any metric.
 
+## 🏙 City 3D (`/city`, experimental)
+
+A third workspace renders a city's buildings and roads as discrete, clickable
+3D entities (deck.gl over a dark MapLibre basemap). Hover highlights an entity;
+click opens a panel with its id, height/width/length, curated properties and
+raw OpenStreetMap tags.
+
+- **Presets:** Paris, Berlin, Moscow, Long Beach, Los Angeles, San Francisco and
+  Boston ship as bundled downtown snapshots (`public/cities/*.json`, ~1.2 km
+  square each). Regenerate them with `pnpm city:snapshots [id…]`.
+- **Anywhere else:** paste a Google Maps URL (`…/@lat,lng,16z`, place links,
+  `?q=`) or `lat, lng`. Areas not already loaded are fetched live (~1 km square)
+  from the public Overpass API. Short links (`maps.app.goo.gl`) can't be
+  resolved in the browser. Paste the full URL instead.
+- **Join keys:** every entity id is its OSM element (`way/123`,
+  `relation/456`), kept as text. **Entities CSV** exports one row per building
+  and road for joining other datasets.
+- Heights come from OSM `height`, else `building:levels × 3.2 m`, else a
+  per-type estimate; the panel says which.
+
+Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright)
+contributors (ODbL); basemap tiles by [OpenFreeMap](https://openfreemap.org).
+
 ## 🚀 Getting Started
 
 ### Prerequisites
