@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "format": "prettier --write .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "city:snapshots": "tsx scripts/fetch-city-snapshots.ts"
   },
   "dependencies": {
     "@deck.gl/core": "^9.4.0",
