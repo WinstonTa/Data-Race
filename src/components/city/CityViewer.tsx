@@ -11,7 +11,7 @@ import {
   type PickingInfo,
 } from "@deck.gl/core";
 import { PathLayer, PolygonLayer } from "@deck.gl/layers";
-import DeckGL from "@deck.gl/react";
+import DeckGL, { type DeckGLRef } from "@deck.gl/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Map as BaseMap } from "react-map-gl/maplibre";
 import type { CityData, LngLat } from "@/core/city/types";
@@ -162,6 +162,17 @@ export function CityViewer() {
   );
   // Remounts (route round trip) start at the last target without re-flying.
   const appliedNonce = useRef(useCityStore.getState().camera?.nonce ?? 0);
+  const deckRef = useRef<DeckGLRef>(null);
+
+  // Dev-only handle for inspecting picking/rendering from the console.
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    const w = window as unknown as { __cityDeck?: () => unknown };
+    w.__cityDeck = () => deckRef.current?.deck;
+    return () => {
+      delete w.__cityDeck;
+    };
+  }, []);
 
   useEffect(() => {
     if (!camera || camera.nonce === appliedNonce.current) return;
@@ -261,6 +272,7 @@ export function CityViewer() {
   return (
     <div className="relative h-full w-full overflow-hidden">
       <DeckGL
+        ref={deckRef}
         viewState={viewState}
         onViewStateChange={({ viewState: next }) =>
           setViewState(next as MapViewState)
