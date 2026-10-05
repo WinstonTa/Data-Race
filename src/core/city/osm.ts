@@ -390,6 +390,18 @@ function buildRoad(way: OsmWay, paths: LngLat[][]): RoadEntity {
   };
 }
 
+/**
+ * Below-ground footprints (garages, station halls) would render as a second
+ * solid prism over the real building, so they're skipped.
+ */
+function isUnderground(tags: Record<string, string>): boolean {
+  return (
+    tags.location === "underground" ||
+    tags.building === "underground" ||
+    Number.parseFloat(tags.layer ?? "") < 0
+  );
+}
+
 export interface CityMeta {
   id: string;
   name: string;
@@ -412,10 +424,12 @@ export function parseOverpass(json: OverpassResponse, meta: CityMeta): CityData 
   for (const el of json.elements) {
     const tags = el.tags ?? {};
     const id = `${el.type}/${el.id}`;
-    if (el.type === "way" && tags.building && tags.building !== "no") {
+    const isBuilding = !!tags.building && tags.building !== "no";
+    if (isBuilding && isUnderground(tags)) continue;
+    if (el.type === "way" && isBuilding) {
       const ring = splitRuns(el.geometry)[0];
       if (ring && ring.length >= 3) buildings.set(id, buildBuilding(id, tags, [[ring]]));
-    } else if (el.type === "relation" && tags.building && tags.building !== "no") {
+    } else if (el.type === "relation" && isBuilding) {
       const polygons = relationPolygons(el as OsmRelation);
       if (polygons.length) buildings.set(id, buildBuilding(id, tags, polygons));
     } else if (el.type === "way" && tags.highway) {

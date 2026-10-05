@@ -23,6 +23,27 @@ const PAUSE_MS = 5_000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** POST a query, backing off on rate limits / gateway timeouts. */
+async function query(ql: string, label: string): Promise<OverpassResponse> {
+  for (let attempt = 1; ; attempt++) {
+    const res = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "DataRace-CityPoC/0.1 (snapshot script)",
+      },
+      body: new URLSearchParams({ data: ql }),
+    });
+    if (res.ok) return (await res.json()) as OverpassResponse;
+    const retryable = [429, 502, 503, 504].includes(res.status);
+    if (!retryable || attempt >= 5)
+      throw new Error(`${label}: HTTP ${res.status}`);
+    const wait = 20_000 * attempt;
+    process.stdout.write(`HTTP ${res.status}, retrying in ${wait / 1000}s… `);
+    await sleep(wait);
+  }
+}
+
 async function main() {
   const only = new Set(process.argv.slice(2));
   const presets = CITY_PRESETS.filter((p) => !only.size || only.has(p.id));
@@ -32,16 +53,7 @@ async function main() {
     if (i > 0) await sleep(PAUSE_MS);
     const bbox = bboxAround(preset.center, preset.halfSizeM);
     process.stdout.write(`${preset.name}… `);
-    const res = await fetch(ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "DataRace-CityPoC/0.1 (snapshot script)",
-      },
-      body: new URLSearchParams({ data: buildOverpassQuery(bbox, 120) }),
-    });
-    if (!res.ok) throw new Error(`${preset.id}: HTTP ${res.status}`);
-    const json = (await res.json()) as OverpassResponse;
+    const json = await query(buildOverpassQuery(bbox, 120), preset.id);
     const city = parseOverpass(json, {
       id: preset.id,
       name: `${preset.name} · ${preset.area}`,
